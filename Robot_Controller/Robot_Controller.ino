@@ -56,6 +56,7 @@ const int OUTTAKE_MB = 9;
 const int OUTTAKE_PWM = 11;
 const int OUTTAKE_ENC_A = 4;
 const int OUTTAKE_ENC_B = 5;
+
 const int SERVO_CHANNEL = 4;
 
 
@@ -136,6 +137,24 @@ void vibrateServo(int angleA, int angleB, unsigned long intervalMs) {
   }
 }
 
+void vibrateOuttake(int motorPower, unsigned long intervalMs) {
+  static unsigned long lastMoveTime = 0;
+  static bool toggle = false;
+
+  unsigned long now = millis();
+
+  if (now - lastMoveTime >= intervalMs) {
+    lastMoveTime = now;
+    toggle = !toggle;
+
+    if (toggle) {
+      outtake.setMotor(-motorPower, -motorPower);
+    } else {
+      outtake.setMotor(motorPower, motorPower);
+    }
+  }
+}
+
 // THIS IS STATE MACHINE TIMER LOGIC
 
 unsigned long stateStartTime = 0;
@@ -172,7 +191,7 @@ void runStateMachine() {
 
     case INTAKE_DOWN:
       if (enteredState) {
-        intake.setTarget(15.0f, 150);   
+        intake.setTarget(17.0f, 150);   
       }
       
       if (intake.isAtTarget()) {
@@ -185,7 +204,7 @@ void runStateMachine() {
         setServo(SERVO_SCOOP);
       }
       
-      intake.setMotor(-8, 50);
+      intake.setMotor(-10, 50);
 
       if (stateDelay(1100)) {
         changeState(INTAKE_TRANSFER_1);
@@ -212,7 +231,7 @@ void runStateMachine() {
       if (stateDelay(500)) {
         setServo(SERVO_TRANSFER_1);
       }
-      if (intake.getPosition() > 93.0f) {
+      if (intake.getPosition() > 90.0f) {
         changeState(INTAKE_TRANSFER_3);
       }
       break;
@@ -224,7 +243,7 @@ void runStateMachine() {
       
       vibrateServo(SERVO_TRANSFER - 4, SERVO_TRANSFER + 4, 50);
         
-      if (stateDelay(1500)) {
+      if (stateDelay(1000)) {
         changeState(OUTTAKE_EXTEND);
       }
       break;
@@ -237,32 +256,32 @@ void runStateMachine() {
 
       //outtake.setTarget(500,200);
       
-      if (stateDelay(3000)) {
-        if (stateDelay(6000)) {
+      if (stateDelay(3150)) {
+        if (stateDelay(6500)) {
             changeState(OUTTAKE_DELAY);
-            outtake.setMotor(0,0);
+            //outtake.setMotor(0,0);
         } else {
-          outtake.setMotor(70,200);
+          outtake.setMotor(63,200);
         }
       } else {
-        outtake.setMotor(230,200);
+        outtake.setMotor(250,250);
       }
   
 
       break;
 
     case OUTTAKE_DELAY:
-    if (enteredState) {
-      intake.stopMotor();
-      outtake.stopMotor();
-    }
+      if (enteredState) {
+        intake.stopMotor();
+        
+      }
 
-    outtake.stopMotor();
-    //outtake.setTarget(500,200);
-    
-    if (stateDelay(0)) {
-        changeState(OUTTAKE_RETRACT);
-    }
+
+      //vibrateOuttake(250,500);
+
+      if (stateDelay(0)) {
+          changeState(OUTTAKE_RETRACT);
+      }
 
     break;
 
@@ -271,10 +290,10 @@ void runStateMachine() {
       if (enteredState) {
       }
 
-      if (stateDelay(3600)) {
+      if (stateDelay(2950)) {
        outtake.stopMotor();
       } else {
-        outtake.setMotor(-200,200);
+        outtake.setMotor(-250,250);
         }
       break;
 
@@ -325,12 +344,12 @@ void printStatus() {
   lastPrint = now;
 
   Serial.print("State: ");
-  Serial.println(stateName(state));
+  Serial.print(stateName(state));
 
-  Serial.print("Intake_Pos");
-  Serial.println(intake.getPosition());
+  Serial.print("    Intake_Pos");
+  Serial.print(intake.getPosition());
 
-  Serial.print("Outtake_Pos");
+  Serial.print("    Outtake_Pos");
   Serial.println(outtake.getPosition());
 
 
@@ -384,7 +403,6 @@ void loop() {
   printStatus();
   
   runStateMachine();
-
   // Example commands:
   //intake.setTarget(90.0f, INTAKE_MAX_PWM);       // arm moves to 90 degrees
   // intake.moveRelative(-15.0f, INTAKE_MAX_PWM);   // arm moves 15 degrees down
