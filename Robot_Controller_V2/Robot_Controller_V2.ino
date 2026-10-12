@@ -100,6 +100,24 @@ const float INTAKE_KD = 0.2f;
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
+// Intake Right
+const int INTAKE_R = 4;
+const int INTAKE_R_MIN = ;
+const int INTAKE_R_MAX = ;
+
+
+// Intake Left
+const int INTAKE_L = 5;
+const int INTAKE_L_MIN = ;
+const int INTAKE_L_MAX = ;
+
+// Intake Scoop
+const int SCOOP = 3;
+const int SCOOP_MIN = ;
+const int SCOOP_MAX = ;
+
+/*
+// Torque Servo
 const int TORQUE_SERVO = 5;
 const int SERVO_MIN = 110;
 const int SERVO_MAX = 580;
@@ -110,6 +128,7 @@ const int SERVO_PICKUP = 140;
 const int SERVO_TRANSFER_1 = 120;
 const int SERVO_TRANSFER = 137;
 const int SERVO_START = 170;
+*/
 
 // =============================================================================
 // CONTROLLERS
