@@ -16,7 +16,6 @@ enum RobotState {
   TRANSFER,
   BEFORE_EXTEND,
   OUTTAKE_EXTEND,
-  OUTTAKE_DELAY,
   OUTTAKE_RETRACT, 
 
   DONE
@@ -31,7 +30,6 @@ const char* stateName(RobotState s) {
     case TRANSFER:         return "TRANSFER";
     case BEFORE_EXTEND:    return "BEFORE_EXTEND";
     case OUTTAKE_EXTEND:   return "OUTTAKE_EXTEND";
-    case OUTTAKE_DELAY:    return "OUTTAKE_DELAY";
     case OUTTAKE_RETRACT:  return "OUTTAKE_RETRACT";
     case DONE:             return "DONE";
     default:               return "UNKNOWN";
@@ -74,6 +72,8 @@ const float OUTTAKE_KP = 0.4f;
 const float OUTTAKE_KI = 0.0f;
 const float OUTTAKE_KD = 0.0f;
 
+MotorController outtake(OUTTAKE_MA, OUTTAKE_MB, OUTTAKE_PWM, OUTTAKE_ENC_A, OUTTAKE_ENC_B);
+
 // =============================================================================
 // SERVO SETTINGS
 // =============================================================================
@@ -105,50 +105,8 @@ const int S_PICKUP = 2100;
 const int S_TRANSFER = 1800;
 
 // =============================================================================
-// CONTROLLERS
+// FSM
 // =============================================================================
-
-MotorController outtake(OUTTAKE_MA, OUTTAKE_MB, OUTTAKE_PWM, OUTTAKE_ENC_A, OUTTAKE_ENC_B);
-/**
-void vibrateServo(int angleA, int angleB, unsigned long intervalMs) {
-  static unsigned long lastMoveTime = 0;
-  static bool toggle = false;
-
-  unsigned long now = millis();
-
-  if (now - lastMoveTime >= intervalMs) {
-    lastMoveTime = now;
-    toggle = !toggle;
-
-    if (toggle) {
-      setServo(angleA);
-    } else {
-      setServo(angleB);
-    }
-  }
-}
-
-void vibrateOuttake(int motorPower, unsigned long intervalMs) {
-  static unsigned long lastMoveTime = 0;
-  static bool toggle = false;
-
-  unsigned long now = millis();
-
-  if (now - lastMoveTime >= intervalMs) {
-    lastMoveTime = now;
-    toggle = !toggle;
-
-    if (toggle) {
-      outtake.setMotor(-motorPower, -motorPower);
-    } else {
-      outtake.setMotor(motorPower, motorPower);
-    }
-  }
-}
-*/
-
-// THIS IS STATE MACHINE TIMER LOGIC
-
 unsigned long stateStartTime = 0;
 unsigned long servoJiggleTime = 0;
 RobotState state = DOWN;
@@ -224,7 +182,7 @@ void runStateMachine() {
       }
       break;
 
-    case OUTTAKE_EXTEND:
+    case EXTEND:
       if (enteredState) {
         intake.stopMotor();
         setServo(SERVO_DOWN);
@@ -246,23 +204,7 @@ void runStateMachine() {
 
       break;
 
-    case OUTTAKE_DELAY:
-      if (enteredState) {
-        intake.stopMotor();
-        
-      }
-
-
-      //vibrateOuttake(250,500);
-
-      if (stateDelay(0)) {
-          changeState(OUTTAKE_RETRACT);
-      }
-
-    break;
-
-
-    case OUTTAKE_RETRACT:
+    case RETRACT:
       if (enteredState) {
       }
 
@@ -402,6 +344,10 @@ void printStatus() {
   // Serial.print(" O_power:");
   // Serial.println(outtake.getMotorPower());
 }
+
+// ==================================================
+// Setup and Loop
+// ==================================================
 
 void setup() {
   Serial.begin(DEBUG_BAUD);
