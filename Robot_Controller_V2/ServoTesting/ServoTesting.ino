@@ -1,5 +1,8 @@
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 // ==================================================
 // PCA9685 SETUP
@@ -9,88 +12,106 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 const int SERVO_FREQ = 50;
 
-// Servo channels
-const int INTAKE_R = 4;
-const int INTAKE_L = 5;
-const int SCOOP    = 3;
+// User-facing output numbers:
+// Output 1 = Right intake
+// Output 2 = Left intake
+// Output 3 = Intake scoop
+//
+// The PCA9685 library uses channel numbers 0-15,
+// so we subtract 1 when sending commands.
 
+const int INTAKE_R = 1;
+const int INTAKE_L = 2;
+const int SCOOP    = 3;
 
 // ==================================================
 // INDIVIDUAL SERVO CALIBRATION LIMITS
 // ==================================================
-//
-// IMPORTANT:
-// These are EXAMPLE values, not verified limits for
-// your specific goBILDA servos.
-//
-// Replace them with the safe minimum and maximum
-// pulse widths you measure during calibration.
-//
-// Do not assume that every servo has the same range.
-//
 
-// Intake right — Channel 4
+// IMPORTANT:
+// These are example values, not verified limits.
+// Replace them with the safe limits you measure.
+
 const int INTAKE_R_MIN = 700;
 const int INTAKE_R_MAX = 2300;
 
-// Intake left — Channel 5
 const int INTAKE_L_MIN = 700;
 const int INTAKE_L_MAX = 2300;
 
-// Intake scoop — Channel 3
 const int SCOOP_MIN = 700;
 const int SCOOP_MAX = 2300;
 
+// ==================================================
+// COORDINATED INTAKE CONTROL
+// ==================================================
+
+// These values define the coordinated intake range.
+//
+// At position 0:
+//   Right intake = 700 us
+//   Left intake  = 2300 us
+//
+// At position 1000:
+//   Right intake = 2300 us
+//   Left intake  = 700 us
+//
+// These are example endpoints. Verify that both
+// servos can safely reach these pulse widths.
+
+const int INTAKE_CLOSED_PULSE = 700;
+const int INTAKE_OPEN_PULSE   = 2300;
 
 // ==================================================
 // ADJUSTMENT SETTINGS
 // ==================================================
 
-// Initial adjustment step in microseconds
 int stepSize = 10;
 
-// Currently selected servo
 int selectedChannel = INTAKE_R;
-
-// Last commanded pulse width
 int currentPulseUs = 1500;
 
-// Whether a position has been commanded for the
-// currently selected servo
 bool positionSet = false;
 
+// Current coordinated intake position.
+// -1 means no coordinated position has been commanded.
+int intakePosition = -1;
+
+// ==================================================
+// FIXED-SIZE SERIAL INPUT BUFFER
+// ==================================================
+
+const byte COMMAND_BUFFER_SIZE = 24;
+
+char commandBuffer[COMMAND_BUFFER_SIZE];
+byte commandLength = 0;
+bool commandOverflow = false;
 
 // ==================================================
 // GET SERVO NAME
 // ==================================================
 
-const char* getServoName(int channel) {
-
+const __FlashStringHelper* getServoName(int channel) {
   switch (channel) {
-
     case INTAKE_R:
-      return "Intake Right";
+      return F("Intake Right");
 
     case INTAKE_L:
-      return "Intake Left";
+      return F("Intake Left");
 
     case SCOOP:
-      return "Intake Scoop";
+      return F("Intake Scoop");
 
     default:
-      return "Unknown";
+      return F("Unknown");
   }
 }
 
-
 // ==================================================
-// GET SELECTED SERVO MINIMUM
+// GET SERVO MINIMUM
 // ==================================================
 
 int getServoMin(int channel) {
-
   switch (channel) {
-
     case INTAKE_R:
       return INTAKE_R_MIN;
 
@@ -105,15 +126,12 @@ int getServoMin(int channel) {
   }
 }
 
-
 // ==================================================
-// GET SELECTED SERVO MAXIMUM
+// GET SERVO MAXIMUM
 // ==================================================
 
 int getServoMax(int channel) {
-
   switch (channel) {
-
     case INTAKE_R:
       return INTAKE_R_MAX;
 
@@ -128,266 +146,425 @@ int getServoMax(int channel) {
   }
 }
 
-
 // ==================================================
 // CONVERT MICROSECONDS TO PCA9685 COUNTS
 // ==================================================
 
 int microsecondsToCounts(int pulseUs) {
-
   // At 50 Hz, the PWM period is 20,000 microseconds.
   return (int)(pulseUs * 4096.0 / 20000.0 + 0.5);
 }
 
-
 // ==================================================
-// MOVE SERVO
+// MOVE ONE SERVO
 // ==================================================
 
 void setServo(int pulseUs) {
-
-  // Get the limits for the currently selected servo
   int minPulse = getServoMin(selectedChannel);
   int maxPulse = getServoMax(selectedChannel);
 
-  // Check the selected servo's individual limits
+  // Enforce individual servo limits.
   if (pulseUs < minPulse || pulseUs > maxPulse) {
-
     Serial.println();
-    Serial.println("ERROR: Pulse width outside servo limits!");
+    Serial.println(F("ERROR: Pulse width outside servo limits!"));
 
-    Serial.print("Servo: ");
+    Serial.print(F("Servo: "));
     Serial.println(getServoName(selectedChannel));
 
-    Serial.print("Allowed range: ");
+    Serial.print(F("Allowed range: "));
     Serial.print(minPulse);
-    Serial.print(" - ");
+    Serial.print(F(" - "));
     Serial.print(maxPulse);
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
-    Serial.println("Servo position unchanged.");
+    Serial.println(F("Servo position unchanged."));
     Serial.println();
 
     return;
   }
 
-  // Convert pulse width to PCA9685 counts
   int counts = microsecondsToCounts(pulseUs);
 
-  // Command the selected servo
-  pwm.setPWM(selectedChannel, 0, counts);
+  // Convert user-facing output number to PCA9685 channel.
+  pwm.setPWM(selectedChannel - 1, 0, counts);
 
-  // Update the last commanded position
   currentPulseUs = pulseUs;
   positionSet = true;
 
-  // Print the result
-  Serial.print("Servo: ");
+  Serial.print(F("Servo: "));
   Serial.print(getServoName(selectedChannel));
 
-  Serial.print(" | Channel: ");
+  Serial.print(F(" | Output: "));
   Serial.print(selectedChannel);
 
-  Serial.print(" | Pulse: ");
+  Serial.print(F(" | Pulse: "));
   Serial.print(currentPulseUs);
 
-  Serial.print(" us | Counts: ");
+  Serial.print(F(" us | Counts: "));
   Serial.println(counts);
 }
 
+// ==================================================
+// COORDINATED INTAKE CONTROL
+// ==================================================
+
+// position = 0:
+//   Right intake = INTAKE_CLOSED_PULSE
+//   Left intake  = INTAKE_OPEN_PULSE
+//
+// position = 1000:
+//   Right intake = INTAKE_OPEN_PULSE
+//   Left intake  = INTAKE_CLOSED_PULSE
+//
+// The two servos receive mirrored pulse widths.
+//
+// Both pulse widths are checked against their individual
+// calibration limits before either servo is commanded.
+
+bool setIntakes(int position) {
+  // Keep the requested position within 0-1000.
+  position = constrain(position, 0, 1000);
+
+  // Calculate the pulse-width range.
+  const int pulseRange =
+      INTAKE_OPEN_PULSE - INTAKE_CLOSED_PULSE;
+
+  // Calculate the right intake pulse.
+  int rightPulse =
+      INTAKE_CLOSED_PULSE
+      + (long)position * pulseRange / 1000;
+
+  // Calculate the mirrored left intake pulse.
+  int leftPulse =
+      INTAKE_OPEN_PULSE
+      - (long)position * pulseRange / 1000;
+
+  // Check the right intake's individual limits.
+  if (rightPulse < INTAKE_R_MIN ||
+      rightPulse > INTAKE_R_MAX) {
+
+    Serial.println(
+      F("ERROR: Right intake pulse is outside its limits.")
+    );
+
+    Serial.println(F("Neither intake was commanded."));
+
+    return false;
+  }
+
+  // Check the left intake's individual limits.
+  if (leftPulse < INTAKE_L_MIN ||
+      leftPulse > INTAKE_L_MAX) {
+
+    Serial.println(
+      F("ERROR: Left intake pulse is outside its limits.")
+    );
+
+    Serial.println(F("Neither intake was commanded."));
+
+    return false;
+  }
+
+  // Convert pulse widths to PCA9685 counts.
+  int rightCounts = microsecondsToCounts(rightPulse);
+  int leftCounts = microsecondsToCounts(leftPulse);
+
+  // Command the right intake on output 1.
+  pwm.setPWM(INTAKE_R - 1, 0, rightCounts);
+
+  // Command the left intake on output 2.
+  pwm.setPWM(INTAKE_L - 1, 0, leftCounts);
+
+  // Store the coordinated position.
+  intakePosition = position;
+
+  Serial.println();
+  Serial.println(F("========== COORDINATED INTAKES =========="));
+
+  Serial.print(F("Position: "));
+  Serial.print(position);
+  Serial.println(F(" / 1000"));
+
+  Serial.print(F("Right intake: "));
+  Serial.print(rightPulse);
+  Serial.println(F(" us"));
+
+  Serial.print(F("Left intake: "));
+  Serial.print(leftPulse);
+  Serial.println(F(" us"));
+
+  Serial.println(F("=========================================="));
+  Serial.println();
+
+  return true;
+}
 
 // ==================================================
 // PRINT HELP
 // ==================================================
 
 void printHelp() {
+  Serial.println();
+  Serial.println(F("========== SERVO CALIBRATION =========="));
 
   Serial.println();
-  Serial.println("========== SERVO CALIBRATION ==========");
+  Serial.println(F("--- Select Individual Servo ---"));
+  Serial.println(F("s 1       Select intake right"));
+  Serial.println(F("s 2       Select intake left"));
+  Serial.println(F("s 3       Select intake scoop"));
 
   Serial.println();
-  Serial.println("--- Select Servo ---");
-  Serial.println("s 3       Select intake scoop");
-  Serial.println("s 4       Select intake right");
-  Serial.println("s 5       Select intake left");
+  Serial.println(F("--- Individual Position Control ---"));
+  Serial.println(F("p 1500    Set pulse width in microseconds"));
+  Serial.println(F("+         Increase pulse width"));
+  Serial.println(F("-         Decrease pulse width"));
 
   Serial.println();
-  Serial.println("--- Position Control ---");
-  Serial.println("p 1500    Set pulse width in microseconds");
-  Serial.println("+         Increase pulse width");
-  Serial.println("-         Decrease pulse width");
+  Serial.println(F("--- Coordinated Intake Control ---"));
+  Serial.println(F("i 0       Move intakes to position 0"));
+  Serial.println(F("i 250     Move intakes to position 250"));
+  Serial.println(F("i 500     Move intakes to position 500"));
+  Serial.println(F("i 750     Move intakes to position 750"));
+  Serial.println(F("i 1000    Move intakes to position 1000"));
+  Serial.println(F("i+        Increase coordinated position"));
+  Serial.println(F("i-        Decrease coordinated position"));
 
   Serial.println();
-  Serial.println("--- Adjustment ---");
-  Serial.println("step 1    Set adjustment step to 1 us");
-  Serial.println("step 10   Set adjustment step to 10 us");
+  Serial.println(F("--- Adjustment ---"));
+  Serial.println(F("step 1    Set adjustment step to 1 us"));
+  Serial.println(F("step 10   Set adjustment step to 10 us"));
 
   Serial.println();
-  Serial.println("--- Information ---");
-  Serial.println("status    Show position and servo limits");
-  Serial.println("?         Show help");
+  Serial.println(F("--- Information ---"));
+  Serial.println(F("status    Show selected servo status"));
+  Serial.println(F("?         Show help"));
 
   Serial.println();
-  Serial.println("=======================================");
+  Serial.println(F("======================================="));
   Serial.println();
 }
 
+// ==================================================
+// PARSE A NON-NEGATIVE INTEGER
+// ==================================================
+
+bool parseInteger(const char* text, long& result) {
+  if (*text == '\0') {
+    return false;
+  }
+
+  // Only allow decimal digits.
+  for (const char* p = text; *p != '\0'; p++) {
+    if (!isdigit((unsigned char)*p)) {
+      return false;
+    }
+  }
+
+  char* endPointer;
+  result = strtol(text, &endPointer, 10);
+
+  if (*endPointer != '\0') {
+    return false;
+  }
+
+  return true;
+}
 
 // ==================================================
 // PROCESS SERIAL COMMANDS
 // ==================================================
 
-void processCommand(String command) {
-
-  command.trim();
-
-  if (command.length() == 0) {
-    return;
+void processCommand(char* command) {
+  // Remove leading whitespace.
+  while (isspace((unsigned char)*command)) {
+    command++;
   }
 
+  // Remove trailing whitespace.
+  size_t length = strlen(command);
+
+  while (length > 0 &&
+         isspace((unsigned char)command[length - 1])) {
+    command[--length] = '\0';
+  }
+
+  if (length == 0) {
+    return;
+  }
 
   // ----------------------------------------------
   // HELP
   // ----------------------------------------------
 
-  if (command == "?") {
-
+  if (strcmp(command, "?") == 0) {
     printHelp();
     return;
   }
-
 
   // ----------------------------------------------
   // SELECT SERVO
   // ----------------------------------------------
 
-  if (command.startsWith("s ")) {
+  if (strncmp(command, "s ", 2) == 0) {
+    long channel;
 
-    String value = command.substring(2);
-    value.trim();
+    if (!parseInteger(command + 2, channel) ||
+        channel < 1 || channel > 3) {
 
-    // Validate channel input
-    if (value != "3" &&
-        value != "4" &&
-        value != "5") {
-
-      Serial.println("Choose channel 3, 4 or 5.");
+      Serial.println(F("Choose output 1, 2 or 3."));
       return;
     }
 
-    int channel = value.toInt();
+    selectedChannel = (int)channel;
 
-    selectedChannel = channel;
-
-    // Require a new initial position for the
-    // newly selected servo
+    // Require a new initial position for this servo.
     positionSet = false;
 
     Serial.println();
 
-    Serial.print("Selected servo: ");
+    Serial.print(F("Selected servo: "));
     Serial.println(getServoName(selectedChannel));
 
-    Serial.print("Channel: ");
+    Serial.print(F("Output: "));
     Serial.println(selectedChannel);
 
-    Serial.print("Minimum pulse: ");
+    Serial.print(F("Minimum pulse: "));
     Serial.print(getServoMin(selectedChannel));
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
-    Serial.print("Maximum pulse: ");
+    Serial.print(F("Maximum pulse: "));
     Serial.print(getServoMax(selectedChannel));
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
     Serial.println();
-    Serial.println("Set an initial position, e.g. p 1500.");
+    Serial.println(F("Set an initial position, e.g. p 1500."));
 
     return;
   }
 
-
   // ----------------------------------------------
-  // SET PULSE WIDTH DIRECTLY
+  // COORDINATED INTAKE POSITION
   // ----------------------------------------------
 
-  if (command.startsWith("p ")) {
+  if (strncmp(command, "i ", 2) == 0) {
+    long position;
 
-    String value = command.substring(2);
-    value.trim();
-
-    if (value.length() == 0) {
+    if (!parseInteger(command + 2, position) ||
+        position > 1000) {
 
       Serial.println(
-        "Enter a pulse width in microseconds."
+        F("Enter an intake position from 0 to 1000.")
       );
 
       return;
     }
 
-    // Accept positive integers only
-    for (unsigned int i = 0; i < value.length(); i++) {
-
-      if (!isDigit(value.charAt(i))) {
-
-        Serial.println(
-          "Enter a positive integer."
-        );
-
-        return;
-      }
-    }
-
-    int pulseUs = value.toInt();
-
-    setServo(pulseUs);
-
+    setIntakes((int)position);
     return;
   }
 
+  // ----------------------------------------------
+  // INCREASE COORDINATED INTAKE POSITION
+  // ----------------------------------------------
+
+  if (strcmp(command, "i+") == 0) {
+    if (intakePosition < 0) {
+      Serial.println(
+        F("Set an initial intake position first, e.g. i 500.")
+      );
+
+      return;
+    }
+
+    int newPosition = intakePosition + stepSize;
+
+    if (newPosition > 1000) {
+      newPosition = 1000;
+    }
+
+    setIntakes(newPosition);
+    return;
+  }
 
   // ----------------------------------------------
-  // INCREASE PULSE WIDTH
+  // DECREASE COORDINATED INTAKE POSITION
   // ----------------------------------------------
 
-  if (command == "+") {
+  if (strcmp(command, "i-") == 0) {
+    if (intakePosition < 0) {
+      Serial.println(
+        F("Set an initial intake position first, e.g. i 500.")
+      );
 
+      return;
+    }
+
+    int newPosition = intakePosition - stepSize;
+
+    if (newPosition < 0) {
+      newPosition = 0;
+    }
+
+    setIntakes(newPosition);
+    return;
+  }
+
+  // ----------------------------------------------
+  // SET INDIVIDUAL PULSE WIDTH
+  // ----------------------------------------------
+
+  if (strncmp(command, "p ", 2) == 0) {
+    long pulseUs;
+
+    if (!parseInteger(command + 2, pulseUs) ||
+        pulseUs > 32767) {
+
+      Serial.println(
+        F("Enter a valid positive pulse width in microseconds.")
+      );
+
+      return;
+    }
+
+    setServo((int)pulseUs);
+    return;
+  }
+
+  // ----------------------------------------------
+  // INCREASE INDIVIDUAL PULSE WIDTH
+  // ----------------------------------------------
+
+  if (strcmp(command, "+") == 0) {
     if (!positionSet) {
-
       Serial.println(
-        "Set an initial position first, e.g. p 1500."
+        F("Set an initial position first, e.g. p 1500.")
       );
 
       return;
     }
 
-    // Use a wider integer for the calculation
     long newPulse = (long)currentPulseUs + stepSize;
 
     if (newPulse > getServoMax(selectedChannel)) {
-
       Serial.println(
-        "Maximum pulse width reached. Position unchanged."
+        F("Maximum pulse width reached. Position unchanged.")
       );
 
       return;
     }
 
     setServo((int)newPulse);
-
     return;
   }
 
-
   // ----------------------------------------------
-  // DECREASE PULSE WIDTH
+  // DECREASE INDIVIDUAL PULSE WIDTH
   // ----------------------------------------------
 
-  if (command == "-") {
-
+  if (strcmp(command, "-") == 0) {
     if (!positionSet) {
-
       Serial.println(
-        "Set an initial position first, e.g. p 1500."
+        F("Set an initial position first, e.g. p 1500.")
       );
 
       return;
@@ -396,135 +573,107 @@ void processCommand(String command) {
     long newPulse = (long)currentPulseUs - stepSize;
 
     if (newPulse < getServoMin(selectedChannel)) {
-
       Serial.println(
-        "Minimum pulse width reached. Position unchanged."
+        F("Minimum pulse width reached. Position unchanged.")
       );
 
       return;
     }
 
     setServo((int)newPulse);
-
     return;
   }
-
 
   // ----------------------------------------------
   // CHANGE ADJUSTMENT STEP
   // ----------------------------------------------
 
-  if (command.startsWith("step ")) {
+  if (strncmp(command, "step ", 5) == 0) {
+    long newStep;
 
-    String value = command.substring(5);
-    value.trim();
-
-    if (value.length() == 0) {
+    if (!parseInteger(command + 5, newStep) ||
+        newStep < 1 || newStep > 500) {
 
       Serial.println(
-        "Enter a step size between 1 and 500 us."
+        F("Step must be an integer between 1 and 500 us.")
       );
 
       return;
     }
 
-    // Validate input
-    for (unsigned int i = 0; i < value.length(); i++) {
+    stepSize = (int)newStep;
 
-      if (!isDigit(value.charAt(i))) {
-
-        Serial.println(
-          "Enter a positive integer."
-        );
-
-        return;
-      }
-    }
-
-    int newStep = value.toInt();
-
-    if (newStep < 1 || newStep > 500) {
-
-      Serial.println(
-        "Step must be between 1 and 500 us."
-      );
-
-      return;
-    }
-
-    stepSize = newStep;
-
-    Serial.print("Adjustment step: ");
+    Serial.print(F("Adjustment step: "));
     Serial.print(stepSize);
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
     return;
   }
-
 
   // ----------------------------------------------
   // DISPLAY STATUS
   // ----------------------------------------------
 
-  if (command == "status") {
-
+  if (strcmp(command, "status") == 0) {
     Serial.println();
-    Serial.println("========== SERVO STATUS ==========");
+    Serial.println(F("========== SERVO STATUS =========="));
 
-    Serial.print("Servo: ");
+    Serial.print(F("Servo: "));
     Serial.println(getServoName(selectedChannel));
 
-    Serial.print("Channel: ");
+    Serial.print(F("Output: "));
     Serial.println(selectedChannel);
 
-    Serial.print("Minimum pulse: ");
+    Serial.print(F("Minimum pulse: "));
     Serial.print(getServoMin(selectedChannel));
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
-    Serial.print("Maximum pulse: ");
+    Serial.print(F("Maximum pulse: "));
     Serial.print(getServoMax(selectedChannel));
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
-    Serial.print("Adjustment step: ");
+    Serial.print(F("Adjustment step: "));
     Serial.print(stepSize);
-    Serial.println(" us");
+    Serial.println(F(" us"));
 
     if (positionSet) {
-
-      Serial.print("Last commanded pulse: ");
+      Serial.print(F("Last commanded pulse: "));
       Serial.print(currentPulseUs);
-      Serial.println(" us");
-
+      Serial.println(F(" us"));
     } else {
-
       Serial.println(
-        "No position commanded for this servo yet."
+        F("No individual position commanded for this servo yet.")
       );
     }
 
-    Serial.println("==================================");
+    if (intakePosition >= 0) {
+      Serial.print(F("Last coordinated intake position: "));
+      Serial.print(intakePosition);
+      Serial.println(F(" / 1000"));
+    } else {
+      Serial.println(
+        F("No coordinated intake position commanded yet.")
+      );
+    }
+
+    Serial.println(F("=================================="));
     Serial.println();
 
     return;
   }
 
-
   // ----------------------------------------------
   // UNKNOWN COMMAND
   // ----------------------------------------------
 
-  Serial.println(
-    "Unknown command. Enter ? for help."
-  );
+  Serial.println(F("Unknown command. Enter ? for help."));
 }
-
 
 // ==================================================
 // SETUP
 // ==================================================
 
 void setup() {
-
   Serial.begin(115200);
 
   Wire.begin();
@@ -535,34 +684,50 @@ void setup() {
   delay(500);
 
   Serial.println();
-  Serial.println("Servo calibration ready.");
-
+  Serial.println(F("Servo calibration ready."));
+  Serial.println(F("No servo movement commanded automatically."));
+  Serial.println(F("Individual pulse limits are enabled."));
+  Serial.println(F("Coordinated intake control is enabled."));
   Serial.println(
-    "No servo movement commanded automatically."
-  );
-
-  Serial.println(
-    "Individual pulse limits are enabled."
-  );
-
-  Serial.println(
-    "IMPORTANT: Replace example limits with your measured values."
+    F("IMPORTANT: Replace example limits with your measured values.")
   );
 
   printHelp();
 }
-
 
 // ==================================================
 // LOOP
 // ==================================================
 
 void loop() {
+  // Read serial data one character at a time.
 
-  if (Serial.available()) {
+  while (Serial.available() > 0) {
+    char incoming = Serial.read();
 
-    String command = Serial.readStringUntil('\n');
+    // Process a command when the user presses Enter.
+    if (incoming == '\n' || incoming == '\r') {
+      if (commandOverflow) {
+        Serial.println(
+          F("Command too long. Please enter a shorter command.")
+        );
+      } else if (commandLength > 0) {
+        commandBuffer[commandLength] = '\0';
+        processCommand(commandBuffer);
+      }
 
-    processCommand(command);
+      // Reset the input buffer for the next command.
+      commandLength = 0;
+      commandOverflow = false;
+    } else {
+      // Ignore characters after a command becomes too long.
+      if (!commandOverflow) {
+        if (commandLength < COMMAND_BUFFER_SIZE - 1) {
+          commandBuffer[commandLength++] = incoming;
+        } else {
+          commandOverflow = true;
+        }
+      }
+    }
   }
 }
