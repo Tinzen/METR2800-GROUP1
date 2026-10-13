@@ -3,18 +3,25 @@ goBILDA Servo Calibration
 Servo Positions
 Servo	PCA9685 Channel	Minimum (700)	Maximum (2300).
 
-INTAKE
-Down: 200
-Peak: 350
-Scoop: 150
-Transfer: 920
+// Arm Positions
+const int A_START = 940;
+const int A_DOWN = 200;
+const int A_PEAK = 350;
+const int A_SCOOP = 150;
+const int A_TRANSFER = 900;
+const int A_MOVE = 500;
 
-SCOOP
-Down: 710
-Peak: 1000
-Flat: 1800
-Scoop: 2000
-Transfer: 1650
+// Scoop Positions
+const int S_START = 2300;
+const int S_DOWN = 700;
+const int S_PEAK = 1100;
+const int S_SCOOP = 1900;
+const int S_PICKUP = 2100;
+const int S_TRANSFER = 1800;
+
+
+also i want the intake to gradually go from 200 to 350 to 150 as the scoop goes from 710 to 1800.
+
 
 Overview
 

@@ -10,12 +10,11 @@
 enum RobotState {
   IDLE, 
 
-  SERVO_FIRST_MOVE,
-  INTAKE_DOWN,
-  INTAKE_SCOOP,
-  INTAKE_TRANSFER_1,
-  INTAKE_TRANSFER_2,
-  INTAKE_TRANSFER_3,
+  DOWN,
+  SCOOP,
+  PICKUP,
+  TRANSFER,
+  BEFORE_EXTEND,
   OUTTAKE_EXTEND,
   OUTTAKE_DELAY,
   OUTTAKE_RETRACT, 
@@ -26,14 +25,13 @@ enum RobotState {
 const char* stateName(RobotState s) {
   switch (s) {
     case IDLE:             return "IDLE";
-    case SERVO_FIRST_MOVE: return "SERVO_FIRST_MOVE";
-    case INTAKE_DOWN:      return "INTAKE_DOWN";
-    case INTAKE_SCOOP:     return "INTAKE_SCOOP";
-    case INTAKE_TRANSFER_1:return "INTAKE_TRANSFER_1";
-    case INTAKE_TRANSFER_2:return "INTAKE_TRANSFER_2";
-    case INTAKE_TRANSFER_3: return "INTAKE_TRANSFER_3";
+    case DOWN:             return "DOWN";
+    case SCOOP:            return "SCOOP";
+    case PICKUP:           return "PICKUP";
+    case TRANSFER:         return "TRANSFER";
+    case BEFORE_EXTEND:    return "BEFORE_EXTEND";
     case OUTTAKE_EXTEND:   return "OUTTAKE_EXTEND";
-    case OUTTAKE_DELAY:   return "OUTTAKE_DELAY";
+    case OUTTAKE_DELAY:    return "OUTTAKE_DELAY";
     case OUTTAKE_RETRACT:  return "OUTTAKE_RETRACT";
     case DONE:             return "DONE";
     default:               return "UNKNOWN";
@@ -44,21 +42,16 @@ const char* stateName(RobotState s) {
 const unsigned long DEBUG_BAUD = 9600;
 const unsigned long DEBUG_PRINT_INTERVAL_MS = 100;
 
+// =============================================================================
+// MOTOR SETTINGS
+// =============================================================================
+
 // Motor driver pins
-const int INTAKE_MA = 6;
-const int INTAKE_MB = 7;
-const int INTAKE_PWM = 10;
-const int INTAKE_ENC_A = 2;
-const int INTAKE_ENC_B = 3;
-
-const int OUTTAKE_MA = 8;
-const int OUTTAKE_MB = 9;
+const int OUTTAKE_MA = 6;
+const int OUTTAKE_MB = 7;
 const int OUTTAKE_PWM = 11;
-const int OUTTAKE_ENC_A = 4;
-const int OUTTAKE_ENC_B = 5;
-
-const int SERVO_CHANNEL = 4;
-
+const int OUTTAKE_ENC_A = 2;
+const int OUTTAKE_ENC_B = 3;
 
 // DIRECTIONS
 const int INTAKE_ENCODER_DIRECTION = 1;
@@ -81,63 +74,42 @@ const float OUTTAKE_KP = 0.4f;
 const float OUTTAKE_KI = 0.0f;
 const float OUTTAKE_KD = 0.0f;
 
-//INTAKE ARM STUFF
-const float INTAKE_START_DEGREES = 98.0f;
-
-const float INTAKE_ENCODER_TICKS_PER_ARM_REV = 580.0f;
-const float INTAKE_TOLERANCE_DEGREES = 2.0f;
-const int INTAKE_MAX_PWM = 150;
-const float INTAKE_MAX_DEG_PER_SEC = 90.0f;
-const float INTAKE_MAX_DEG_PER_SEC2 = 180.0f;
-
-const float INTAKE_KP = 3.0f;
-const float INTAKE_KI = 0.005f;
-const float INTAKE_KD = 0.2f;
-
 // =============================================================================
 // SERVO SETTINGS
 // =============================================================================
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
-// Intake Right
-const int INTAKE_R = 4;
-const int INTAKE_R_MIN = ;
-const int INTAKE_R_MAX = ;
+const int SERVO_FREQ = 50;
+const int SERVO_MIN = 700;
+const int SERVO_MAX = 2300;
 
+const int ARM_R = 1;
+const int ARM_L = 2;
+const int SCOOP_SERVO = 3;
 
-// Intake Left
-const int INTAKE_L = 5;
-const int INTAKE_L_MIN = ;
-const int INTAKE_L_MAX = ;
+// Arm Positions
+const int A_START = 940;
+const int A_DOWN = 200;
+const int A_PEAK = 350;
+const int A_SCOOP = 150;
+const int A_TRANSFER = 920;
+const int A_MOVE = 500;
 
-// Intake Scoop
-const int SCOOP = 3;
-const int SCOOP_MIN = ;
-const int SCOOP_MAX = ;
-
-/*
-// Torque Servo
-const int TORQUE_SERVO = 5;
-const int SERVO_MIN = 110;
-const int SERVO_MAX = 580;
-
-const int SERVO_DOWN = 31;
-const int SERVO_SCOOP = 127;
-const int SERVO_PICKUP = 140;
-const int SERVO_TRANSFER_1 = 120;
-const int SERVO_TRANSFER = 137;
-const int SERVO_START = 170;
-*/
+// Scoop Positions
+const int S_START = 2300;
+const int S_DOWN = 700;
+const int S_PEAK = 1100;
+const int S_SCOOP = 1900;
+const int S_PICKUP = 2100;
+const int S_TRANSFER = 1800;
 
 // =============================================================================
 // CONTROLLERS
 // =============================================================================
 
-MotorController intake(INTAKE_MA, INTAKE_MB, INTAKE_PWM, INTAKE_ENC_A, INTAKE_ENC_B);
 MotorController outtake(OUTTAKE_MA, OUTTAKE_MB, OUTTAKE_PWM, OUTTAKE_ENC_A, OUTTAKE_ENC_B);
-
-
+/**
 void vibrateServo(int angleA, int angleB, unsigned long intervalMs) {
   static unsigned long lastMoveTime = 0;
   static bool toggle = false;
@@ -173,12 +145,13 @@ void vibrateOuttake(int motorPower, unsigned long intervalMs) {
     }
   }
 }
+*/
 
 // THIS IS STATE MACHINE TIMER LOGIC
 
 unsigned long stateStartTime = 0;
 unsigned long servoJiggleTime = 0;
-RobotState state = SERVO_FIRST_MOVE;
+RobotState state = DOWN;
 // Helper delay
 bool stateDelay(unsigned long ms) {
   return millis() - stateStartTime >= ms;
@@ -199,71 +172,55 @@ void runStateMachine() {
   lastState = state;
 
   switch (state) {
-    case SERVO_FIRST_MOVE:
-      if (enteredState) {
-          setServo(SERVO_DOWN);  
-        }
-      if (stateDelay(300)) {
-        changeState(INTAKE_DOWN);
-      }
     break;
-
-    case INTAKE_DOWN:
+    case DOWN:
       if (enteredState) {
-        intake.setTarget(17.0f, 150);   
+        setScoop(S_DOWN);
+        delay(500);
+        setArm(A_DOWN);        
       }
       
-      if (intake.isAtTarget()) {
-        changeState(INTAKE_SCOOP);
+      if (stateDelay(1000)) {
+        changeState(SCOOP);
       }
       break;
 
-    case INTAKE_SCOOP:
+    case SCOOP:
       if (enteredState) {
-        setServo(SERVO_SCOOP);
+        scoopSweep();
       }
       
-      intake.setMotor(-10, 50);
-
-      if (stateDelay(1100)) {
-        changeState(INTAKE_TRANSFER_1);
-      }
+      changeState(PICKUP);
       break; 
 
-    case INTAKE_TRANSFER_1:
+    case PICKUP:
       if (enteredState) {
-        setServo(SERVO_PICKUP);
+        setScoop(S_PICKUP);
       }
-
-      intake.setMotor(-8, 50);
-        
-      if (stateDelay(100)) {
-        changeState(INTAKE_TRANSFER_2);
-      }
-      break;
-
-    case INTAKE_TRANSFER_2:
-      if (enteredState) {
-        intake.setTarget(105,150);
-      }
-
-      if (stateDelay(500)) {
-        setServo(SERVO_TRANSFER_1);
-      }
-      if (intake.getPosition() > 90.0f) {
-        changeState(INTAKE_TRANSFER_3);
-      }
-      break;
-
-     case INTAKE_TRANSFER_3:
-      if (enteredState) {
-        setServo(SERVO_TRANSFER);
-      }
-      
-      vibrateServo(SERVO_TRANSFER - 4, SERVO_TRANSFER + 4, 50);
         
       if (stateDelay(1000)) {
-        changeState(OUTTAKE_EXTEND);
+        changeState(TRANSFER);
+      }
+      break;
+
+    case TRANSFER:
+      if (enteredState) {
+        setArm(A_TRANSFER);
+        setScoop(S_TRANSFER);
+      }
+
+      if (stateDelay(2000)) {
+        changeState(BEFORE_EXTEND);
+      }
+      break;
+
+     case BEFORE_EXTEND:
+      if (enteredState) {
+        setArm(A_MOVE);
+      }
+              
+      if (stateDelay(1000)) {
+        changeState(DONE);
       }
       break;
 
@@ -325,25 +282,75 @@ void runStateMachine() {
       
   }
 }
-//THIS IS STATE MACHINE TIMER LOGIC
 
-void setServo(int angle) {
-  angle = constrain(angle, 0, 180);
-  const int pulse = map(angle, 0, 180, SERVO_MIN, SERVO_MAX);
-  pwm.setPWM(SERVO_CHANNEL, 0, pulse);
+// ==================================================
+// FSM LOGIC
+// ==================================================
+
+int microsecondsToCounts(int pulseUs) {
+  // At 50 Hz, the PWM period is 20,000 microseconds.
+  return (int)(pulseUs * 4096.0 / 20000.0 + 0.5);
+}
+
+void setServo(int channel, int pulseUs) {
+  int counts = microsecondsToCounts(pulseUs);
+
+  // Convert user-facing output number to PCA9685 channel.
+  pwm.setPWM(channel - 1, 0, counts);
+}
+
+// Coordinated Intake Control
+bool setArm(int position) {
+  position = constrain(position, 0, 1000);
+
+  int rightPulse = SERVO_MIN
+                 + (long)position * (SERVO_MAX - SERVO_MIN) / 1000;
+
+  int leftPulse = SERVO_MAX
+                - (long)position * (SERVO_MAX - SERVO_MIN) / 1000;
+
+  setServo(ARM_R, rightPulse);
+  setServo(ARM_L, leftPulse);
+
+  return true;
+}
+
+void setScoop(int pulseUs) {
+  setServo(SCOOP_SERVO, pulseUs);
+}
+
+void scoopSweep() {
+  const int steps = 100;
+  const int stepDelayMs = 20;
+
+  for (int i = 0; i <= steps; i++) {
+    // Progress goes from 0 to 1000 across the sweep.
+    long progress = (long)i * 1000 / steps;
+
+    // Scoop moves from S_DOWN to S_SCOOP.
+    int scoopPulse = S_DOWN + (S_SCOOP - S_DOWN) * progress / 1000;
+    setScoop(scoopPulse);
+
+    // Arm rises to A_PEAK at the midpoint, then lowers to A_SCOOP.
+    int armPosition;
+
+    if (progress < 500) {
+      armPosition = A_DOWN + (A_PEAK - A_DOWN) * progress / 500;
+    } else {
+      armPosition = A_PEAK - (A_PEAK - A_SCOOP) * (progress - 500) / 500;
+    }
+
+    setArm(armPosition);
+    delay(stepDelayMs);
+  }
+}
+
+void initServos() {
+  setArm(A_START);
+  setScoop(S_START);
 }
 
 void configureControllers() {
-  // Intake arm: degree-based controller.
-  intake.setUnitsDegrees(INTAKE_ENCODER_TICKS_PER_ARM_REV);
-  intake.setEncoderDirection(INTAKE_ENCODER_DIRECTION);
-  intake.setMotorDirection(INTAKE_MOTOR_DIRECTION);
-  intake.setPID(INTAKE_KP, INTAKE_KI, INTAKE_KD);
-  intake.setProfileLimits(INTAKE_MAX_DEG_PER_SEC, INTAKE_MAX_DEG_PER_SEC2);
-  intake.setMaxPwm(INTAKE_MAX_PWM);
-  intake.setTolerance(INTAKE_TOLERANCE_DEGREES);
-  intake.begin(INTAKE_START_DEGREES);
-
   // Outtake slides: tick-based controller.
   outtake.setUnitsTicks();
   outtake.setEncoderDirection(OUTTAKE_ENCODER_DIRECTION);
@@ -365,12 +372,8 @@ void printStatus() {
   Serial.print("State: ");
   Serial.print(stateName(state));
 
-  Serial.print("    Intake_Pos");
-  Serial.print(intake.getPosition());
-
   Serial.print("    Outtake_Pos");
   Serial.println(outtake.getPosition());
-
 
   // Serial.print("I_deg:");
   // Serial.print(intake.getPosition(), 1);
@@ -404,20 +407,18 @@ void setup() {
   Serial.begin(DEBUG_BAUD);
 
   pwm.begin();
-  pwm.setPWMFreq(50);
-  setServo(SERVO_START);
+  pwm.setPWMFreq(SERVO_FREQ);
 
+  initServos();
   configureControllers();
 
   Serial.println("---------- Robot start ----------");
-  Serial.println("Intake units: degrees. Outtake units: encoder ticks.");
 
-  changeState(SERVO_FIRST_MOVE);
+  changeState(DOWN);
   //changeState(OUTTAKE_EXTEND);
 }
 
 void loop() {
-  intake.update();
   outtake.update();
   printStatus();
   

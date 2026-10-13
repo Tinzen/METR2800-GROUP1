@@ -13,15 +13,15 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 const int SERVO_FREQ = 50;
 
 // User-facing output numbers:
-// Output 1 = Right intake
-// Output 2 = Left intake
+// Output 1 = Right arm
+// Output 2 = Left arm
 // Output 3 = Intake scoop
 //
 // The PCA9685 library uses channel numbers 0-15,
 // so we subtract 1 when sending commands.
 
-const int INTAKE_R = 1;
-const int INTAKE_L = 2;
+const int ARM_R = 1;
+const int ARM_L = 2;
 const int SCOOP    = 3;
 
 // ==================================================
@@ -32,14 +32,8 @@ const int SCOOP    = 3;
 // These are example values, not verified limits.
 // Replace them with the safe limits you measure.
 
-const int INTAKE_R_MIN = 700;
-const int INTAKE_R_MAX = 2300;
-
-const int INTAKE_L_MIN = 700;
-const int INTAKE_L_MAX = 2300;
-
-const int SCOOP_MIN = 700;
-const int SCOOP_MAX = 2300;
+const int SERVO_MIN = 700;
+const int SERVO_MAX = 2300;
 
 // ==================================================
 // COORDINATED INTAKE CONTROL
@@ -67,7 +61,7 @@ const int INTAKE_OPEN_PULSE   = 2300;
 
 int stepSize = 10;
 
-int selectedChannel = INTAKE_R;
+int selectedChannel = ARM_R;
 int currentPulseUs = 1500;
 
 bool positionSet = false;
@@ -92,10 +86,10 @@ bool commandOverflow = false;
 
 const __FlashStringHelper* getServoName(int channel) {
   switch (channel) {
-    case INTAKE_R:
+    case ARM_R:
       return F("Intake Right");
 
-    case INTAKE_L:
+    case ARM_L:
       return F("Intake Left");
 
     case SCOOP:
@@ -103,46 +97,6 @@ const __FlashStringHelper* getServoName(int channel) {
 
     default:
       return F("Unknown");
-  }
-}
-
-// ==================================================
-// GET SERVO MINIMUM
-// ==================================================
-
-int getServoMin(int channel) {
-  switch (channel) {
-    case INTAKE_R:
-      return INTAKE_R_MIN;
-
-    case INTAKE_L:
-      return INTAKE_L_MIN;
-
-    case SCOOP:
-      return SCOOP_MIN;
-
-    default:
-      return 0;
-  }
-}
-
-// ==================================================
-// GET SERVO MAXIMUM
-// ==================================================
-
-int getServoMax(int channel) {
-  switch (channel) {
-    case INTAKE_R:
-      return INTAKE_R_MAX;
-
-    case INTAKE_L:
-      return INTAKE_L_MAX;
-
-    case SCOOP:
-      return SCOOP_MAX;
-
-    default:
-      return 0;
   }
 }
 
@@ -160,11 +114,8 @@ int microsecondsToCounts(int pulseUs) {
 // ==================================================
 
 void setServo(int pulseUs) {
-  int minPulse = getServoMin(selectedChannel);
-  int maxPulse = getServoMax(selectedChannel);
-
   // Enforce individual servo limits.
-  if (pulseUs < minPulse || pulseUs > maxPulse) {
+  if (pulseUs < SERVO_MIN || pulseUs > SERVO_MAX) {
     Serial.println();
     Serial.println(F("ERROR: Pulse width outside servo limits!"));
 
@@ -172,9 +123,9 @@ void setServo(int pulseUs) {
     Serial.println(getServoName(selectedChannel));
 
     Serial.print(F("Allowed range: "));
-    Serial.print(minPulse);
+    Serial.print(SERVO_MIN);
     Serial.print(F(" - "));
-    Serial.print(maxPulse);
+    Serial.print(SERVO_MAX);
     Serial.println(F(" us"));
 
     Serial.println(F("Servo position unchanged."));
@@ -230,18 +181,15 @@ bool setIntakes(int position) {
       INTAKE_OPEN_PULSE - INTAKE_CLOSED_PULSE;
 
   // Calculate the right intake pulse.
-  int rightPulse =
-      INTAKE_CLOSED_PULSE
-      + (long)position * pulseRange / 1000;
+  int rightPulse = SERVO_MIN
+                 + (long)position * (SERVO_MAX - SERVO_MIN) / 1000;
 
-  // Calculate the mirrored left intake pulse.
-  int leftPulse =
-      INTAKE_OPEN_PULSE
-      - (long)position * pulseRange / 1000;
+  int leftPulse = SERVO_MAX
+                - (long)position * (SERVO_MAX - SERVO_MIN) / 1000;
 
   // Check the right intake's individual limits.
-  if (rightPulse < INTAKE_R_MIN ||
-      rightPulse > INTAKE_R_MAX) {
+  if (rightPulse < SERVO_MIN ||
+      rightPulse > SERVO_MAX) {
 
     Serial.println(
       F("ERROR: Right intake pulse is outside its limits.")
@@ -253,8 +201,8 @@ bool setIntakes(int position) {
   }
 
   // Check the left intake's individual limits.
-  if (leftPulse < INTAKE_L_MIN ||
-      leftPulse > INTAKE_L_MAX) {
+  if (leftPulse < SERVO_MIN ||
+      leftPulse > SERVO_MAX) {
 
     Serial.println(
       F("ERROR: Left intake pulse is outside its limits.")
@@ -270,10 +218,10 @@ bool setIntakes(int position) {
   int leftCounts = microsecondsToCounts(leftPulse);
 
   // Command the right intake on output 1.
-  pwm.setPWM(INTAKE_R - 1, 0, rightCounts);
+  pwm.setPWM(ARM_R - 1, 0, rightCounts);
 
   // Command the left intake on output 2.
-  pwm.setPWM(INTAKE_L - 1, 0, leftCounts);
+  pwm.setPWM(ARM_L - 1, 0, leftCounts);
 
   // Store the coordinated position.
   intakePosition = position;
@@ -429,11 +377,11 @@ void processCommand(char* command) {
     Serial.println(selectedChannel);
 
     Serial.print(F("Minimum pulse: "));
-    Serial.print(getServoMin(selectedChannel));
+    Serial.print(SERVO_MIN);
     Serial.println(F(" us"));
 
     Serial.print(F("Maximum pulse: "));
-    Serial.print(getServoMax(selectedChannel));
+    Serial.print(SERVO_MAX);
     Serial.println(F(" us"));
 
     Serial.println();
@@ -545,7 +493,7 @@ void processCommand(char* command) {
 
     long newPulse = (long)currentPulseUs + stepSize;
 
-    if (newPulse > getServoMax(selectedChannel)) {
+    if (newPulse > SERVO_MAX) {
       Serial.println(
         F("Maximum pulse width reached. Position unchanged.")
       );
@@ -572,7 +520,7 @@ void processCommand(char* command) {
 
     long newPulse = (long)currentPulseUs - stepSize;
 
-    if (newPulse < getServoMin(selectedChannel)) {
+    if (newPulse < SERVO_MIN) {
       Serial.println(
         F("Minimum pulse width reached. Position unchanged.")
       );
@@ -625,11 +573,11 @@ void processCommand(char* command) {
     Serial.println(selectedChannel);
 
     Serial.print(F("Minimum pulse: "));
-    Serial.print(getServoMin(selectedChannel));
+    Serial.print(SERVO_MIN);
     Serial.println(F(" us"));
 
     Serial.print(F("Maximum pulse: "));
-    Serial.print(getServoMax(selectedChannel));
+    Serial.print(SERVO_MAX);
     Serial.println(F(" us"));
 
     Serial.print(F("Adjustment step: "));
