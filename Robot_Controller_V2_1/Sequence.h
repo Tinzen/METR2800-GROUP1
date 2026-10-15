@@ -14,7 +14,6 @@
 
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -47.4f;  // power-on pose (V2 940)
-const float A_DOWN     =  100.6f;  // V2 200
 const float A_DOWN     =  105.0f;  // V2 200
 const float A_PEAK     =   75.0f;  // sweep lifts to here halfway (V2 350)
 const float A_SCOOP    =  115.0f;  // sweep ends here: scoop flat on the floor (V2 150)
