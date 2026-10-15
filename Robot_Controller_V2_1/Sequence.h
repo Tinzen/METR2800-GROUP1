@@ -15,8 +15,9 @@
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -47.4f;  // power-on pose (V2 940)
 const float A_DOWN     =  100.6f;  // V2 200
-const float A_PEAK     =   69.0f;  // sweep lifts to here halfway (V2 350)
-const float A_SCOOP    =  112.0f;  // sweep ends here: scoop flat on the floor (V2 150)
+const float A_DOWN     =  105.0f;  // V2 200
+const float A_PEAK     =   75.0f;  // sweep lifts to here halfway (V2 350)
+const float A_SCOOP    =  115.0f;  // sweep ends here: scoop flat on the floor (V2 150)
 const float A_TRANSFER =  -43.0f;  // over the bucket (V2 920)
 const float A_MOVE     =   40.6f;  // clear of the slides (V2 500)
 
@@ -29,8 +30,8 @@ const float S_CARRY    =  -84.4f;  // during the lift: keeps the rocks in (V2 tr
 const float S_POUR     = -70.0f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
 
 // ---- SLIDE POSITIONS (mm) ---------------------------------------------------
-const float X_CREEP    =  450.0f;  // slow down here, just before the bucket touches the pole
-const float X_TIP      =  530.0f;  // bucket fully tipped   (SAFE PLACEHOLDERS: CAD says ~1650 / ~1740)
+const float X_CREEP    =  3000.0f;  // slow down here, just before the bucket touches the pole
+const float X_TIP      =  3220.0f;  // bucket fully tipped   (SAFE PLACEHOLDERS: CAD says ~1650 / ~1740)
 
 // ---- SPEEDS -----------------------------------------------------------------
 const float ARM_SPEED   =  300.0f; // deg/s     (PROFILED moves)
@@ -38,9 +39,9 @@ const float ARM_ACCEL   = 1600.0f; // deg/s^2
 const float SCOOP_SPEED =  450.0f; // deg/s
 const float SCOOP_ACCEL = 2250.0f; // deg/s^2
 const float SLIDE_FAST  = 1000.0f; // mm/s
-const float SLIDE_CREEP =  100.0f; // mm/s      bucket tips slowly at this speed
-const float SLIDE_MAX   = 1100.0f; // mm/s      (free speed ~1480, keep under ~1170)
-const float SLIDE_ACCEL = 3000.0f; // mm/s^2
+const float SLIDE_CREEP =  200.0f; // mm/s      bucket tips slowly at this speed
+const float SLIDE_MAX   = 2000.0f; // mm/s      (free speed ~1480, keep under ~1170)
+const float SLIDE_ACCEL = 5000.0f; // mm/s^2
 
 // ---- VIBRATION / TIMED MOVES ------------------------------------------------
 const float VIBRATE_DEG = 7.5f;            // +/- deg (V1 ~ +/-50 us)
@@ -64,6 +65,6 @@ const Step SEQUENCE[] PROGMEM = {
   { "VIBRATE",     HOLD,        HOLD,      HOLD,     0,           PROFILED, NONE,    VIBRATE_DEG, WAIT_MS(1000)    },  // V1: shake the rest out
   { "EXTEND",      A_MOVE,      HOLD,      X_CREEP,  SLIDE_FAST,  PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // arm clears while slides go
   { "CREEP",       HOLD,        HOLD,      X_TIP,    SLIDE_CREEP, PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // blends from fast, no stop
-  { "TIP_HOLD",    HOLD,        HOLD,      HOLD,     0,           PROFILED, NONE,    0,           WAIT_MS(300)     },  // let the rocks fall
+  { "TIP_HOLD",    HOLD,        HOLD,      HOLD,     0,           PROFILED, NONE,    0,           WAIT_MS(1000)     },  // let the rocks fall
   { "RETRACT",     HOLD,        HOLD,      0,        SLIDE_MAX,   PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // back in at max speed
 };
