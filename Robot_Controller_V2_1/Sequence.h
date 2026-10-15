@@ -15,18 +15,18 @@
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -47.4f;  // power-on pose (V2 940)
 const float A_DOWN     =  100.6f;  // V2 200
-const float A_PEAK     =   70.6f;  // sweep lifts to here halfway (V2 350)
-const float A_SCOOP    =  110.6f;  // sweep ends here: scoop flat on the floor (V2 150)
-const float A_TRANSFER =  -43.4f;  // over the bucket (V2 920)
+const float A_PEAK     =   69.0f;  // sweep lifts to here halfway (V2 350)
+const float A_SCOOP    =  112.0f;  // sweep ends here: scoop flat on the floor (V2 150)
+const float A_TRANSFER =  -43.0f;  // over the bucket (V2 920)
 const float A_MOVE     =   40.6f;  // clear of the slides (V2 500)
 
 // ---- SCOOP ANGLES (deg) -----------------------------------------------------
 const float S_START    =   -9.4f;  // power-on pose (V2 2300 us)
 const float S_DOWN     = -249.4f;  // V2 700 us
 const float S_SCOOP    =  -69.4f;  // end of sweep: blade flat on the floor (V2 1900 us)
-const float S_PICKUP   =  -39.4f;  // lip up (V2 2100 us)
+const float S_PICKUP   =  -30.0f;  // lip up (V2 2100 us)
 const float S_CARRY    =  -84.4f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
-const float S_POUR     = -104.4f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
+const float S_POUR     = -70.0f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
 
 // ---- SLIDE POSITIONS (mm) ---------------------------------------------------
 const float X_CREEP    =  450.0f;  // slow down here, just before the bucket touches the pole
