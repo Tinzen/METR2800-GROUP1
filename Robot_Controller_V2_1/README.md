@@ -8,6 +8,7 @@ The competition program for the V2 robot (servo intake, goBILDA slide motor). It
 | `RobotConfig.h` | Pins, slide gear ratio and spool, servo calibration, slide gains, safety limits. Must match `ROBOT_SPECS.md`. | Calibration results, spec changes |
 | `Robot_Controller_V2_1.ino` | The step runner, safety monitors, telemetry, serial console. No tuning numbers. | Code changes only |
 | `SequenceTypes.h` | The keywords used in `Sequence.h` (`HOLD`, `WAIT_MS` ...). | Nobody |
+| `LOGGING.md` | First-time guide: Python + pyserial setup, logging a run with `tools/capture_log.py`, troubleshooting. | |
 | `MotionProfile`, `MotorController`, `ServoAxis`, `PIDController` | Trapezoid profiles (with blending), slide PID + feedforward, servo axes in degrees. | Code changes only |
 
 ## The sequence
@@ -52,7 +53,7 @@ Pictures come from the twin with CAD estimates; the twin's angles are only exact
 1. Open `tools/sequence_editor.html` in Chrome or Edge → **Open robot folder** → pick this folder. Edit, watch the twin and the predicted run time, **Save** (Ctrl+S).
 2. Upload `Robot_Controller_V2_1.ino`.
 3. First runs on the robot: set `SPEED_PCT_AT_BOOT = 25` (slow motion) and/or `STEP_MODE_AT_BOOT = true` (pauses after every step, `n` = next), or use the console commands below.
-4. Log runs with `python tools/capture_log.py` and open the `.html` it writes.
+4. Log runs with `python tools/capture_log.py` and open the `.html` it writes. **Never done it?** [`LOGGING.md`](LOGGING.md) walks through installing Python and pyserial, then logging a run.
 
 **Tune it in the editor first**, then confirm on the robot: see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). The Jog sliders pose the twin with no robot; Capture writes the pose into an angle or slide position.
 

@@ -50,7 +50,7 @@ This is the entry point for every agent (Claude, Codex, teammates' tools) and ev
 | `SEQUENCE_TUNING.md` | How to tune the sequence in the editor first, then confirm on the robot. |
 | `tools/sequence_editor.html` | Edit the sequence with the 3D twin (play bar, Fusion-style camera), plain-English Step tab, offline jog + capture, predicted timing, live link to the robot (Web Serial), servo calibration. Needs `three.min.js` + `twin_model.js` beside it. Screenshots in `tools/img/`. |
 | `tools/run_viewer.html` | Logged runs: plots, Gantt, FF fit, 3D twin. |
-| `tools/capture_log.py` | Serial → `logs/run_*.csv` plus a `.html` with the run embedded. |
+| `tools/capture_log.py` | Serial → `logs/run_*.csv` plus a `.html` with the run embedded. First-time setup (Python, pyserial, ports, troubleshooting): `Robot_Controller_V2_1/LOGGING.md`. |
 | `tools/cad_twin/` | STEP → `twin_model.js` pipeline. Mesh IDs change on every re-export. |
 | `tools/sil_sim/` | PC build of V2.1 against mocks plus a slide plant model. |
 | `Robot_Controller/`, `Robot_Controller_V2/` | V1 and V2 programs. Reference only. `Version 1 Demonstration.mp4` shows the V1 sequence V2.1 copies for the transfer. |
@@ -101,3 +101,5 @@ This is the entry point for every agent (Claude, Codex, teammates' tools) and ev
   - Sequence editor: play bar on the twin, Fusion 360 / Inventor camera, Step tab (plain-English step editor), "What happens" column, add-step presets, jog sliders that pose the twin with no robot and capture arm, scoop and slide values. New `SEQUENCE_TUNING.md`.
   - Sequence editor: drag timeline edges to retime a step, drag rows to reorder, spill warning (scoop pours while loaded before the arm is over the bucket), before/after ghost when editing or jogging an angle. The twin flags a ~0.1 s spill risk at the LIFT → CARRY hand-over (arm ~30°); check on the robot, values not changed.
   - `tools/run_viewer.html`: same Fusion 360 / Inventor camera as the editor (patched in place).
+  - New `Robot_Controller_V2_1/LOGGING.md` (first-time Python + pyserial logging guide); linked from the V2.1, calibration, Slide_Test, Slide_PID_Tune and logs READMEs.
+  - `calibration/Servo_Offset_Cal`: new README. `p` in level mode now prints the level pulses separately and still pastes the reference values; typing `level` twice no longer offsets again from the level pulses.

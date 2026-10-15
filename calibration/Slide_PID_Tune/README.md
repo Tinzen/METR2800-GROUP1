@@ -75,7 +75,7 @@ Change **one** gain at a time and rerun the same bounce test. Otherwise you can'
 
 ## Logging
 
-This sketch outputs the same data format as `Slide_Test` and `V2_1`, so the Python logger works:
+This sketch outputs the same data format as `Slide_Test` and `V2_1`, so the Python logger works. First time? Set up Python and pyserial with [`Robot_Controller_V2_1/LOGGING.md`](../../Robot_Controller_V2_1/LOGGING.md).
 
 ```
 python tools/capture_log.py --port COM5 --keep-open --label pidtune

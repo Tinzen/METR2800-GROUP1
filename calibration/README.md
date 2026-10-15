@@ -2,6 +2,8 @@
 
 Do these in order the first time, and again after a rebuild. Battery **on** for every step (the encoder's 5 V comes from the battery side). Serial Monitor at **115200**, line ending **Newline**.
 
+To save a test as graphs instead (Slide_Test, Slide_PID_Tune), use the Python logger. First-time setup: [`Robot_Controller_V2_1/LOGGING.md`](../Robot_Controller_V2_1/LOGGING.md).
+
 | # | Sketch / tool | What you find | Where it goes |
 |---|---|---|---|
 | 1 | `Slide_Encoder_Check` | wiring, encoder and motor direction | `SLIDE_ENCODER_DIR`, `SLIDE_MOTOR_DIR` in `RobotConfig.h` |
@@ -32,6 +34,8 @@ See `Slide_Test/README.md` for jogging and finding `ks` / `kg`. Then find the tw
 See its README. Paste the `g` output into the `SLIDE_K*` lines of `RobotConfig.h` (same numbers, new names: `OUTTAKE_KP` → `SLIDE_KP` and so on).
 
 ## 4. Servo offsets: `Servo_Offset_Cal`
+
+Full command list, scale check and troubleshooting: [`Servo_Offset_Cal/README.md`](Servo_Offset_Cal/README.md).
 
 The servos have no position feedback, so the code only knows angles through these three numbers. The V2 pulse widths are already right on the robot; this step makes the **twin** match the robot, so the angles you edit mean real degrees.
 

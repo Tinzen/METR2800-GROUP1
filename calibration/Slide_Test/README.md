@@ -101,7 +101,7 @@ Type gains like any command: `kg 20` + Enter. They apply immediately and are **l
 
 ## Option B: Python logger (saves graphs)
 
-One-time setup: install Python (tick "Add to PATH"), then `pip install pyserial`.
+One-time setup: Python and pyserial, step by step in [`Robot_Controller_V2_1/LOGGING.md`](../../Robot_Controller_V2_1/LOGGING.md) (Part 1). Its Troubleshooting table covers "Access is denied", missing ports and the other usual problems.
 
 1. Upload from the Arduino IDE, then **close the Serial Monitor**.
 2. In File Explorer open `METR2800-GROUP1`, type `cmd` in the address bar, Enter. Keep this window open.

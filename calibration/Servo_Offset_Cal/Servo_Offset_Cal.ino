@@ -80,11 +80,21 @@ void show() {
   Serial.println(F(" us"));
 }
 
+// "level" pose: arm vertical (0 deg), scoop 0 deg (blade level, like the CAD)
+float refR, refL, refS;      // reference pulses (kept so 'cal' returns there)
+bool atLevel = false;
+
 void printPaste() {
+  float r = armRUs, l = armLUs, s = scoopUs;
+  if (atLevel) {             // level pulses are for the scale check only, never the *_CAL_US
+    Serial.print(F("# LEVEL pose (editor > Calibration > Scale check):  R ")); Serial.print(armRUs, 1);
+    Serial.print(F("   S ")); Serial.println(scoopUs, 1);
+    r = refR; l = refL; s = refS;
+  }
   Serial.println(F("---- paste into Robot_Controller_V2_1/RobotConfig.h (or the editor's Calibration tab) ----"));
-  Serial.print(F("const float ARM_R_CAL_US = ")); Serial.print(armRUs, 1); Serial.println(F("f;"));
-  Serial.print(F("const float ARM_L_CAL_US = ")); Serial.print(armLUs, 1); Serial.println(F("f;"));
-  Serial.print(F("const float SCOOP_CAL_US = ")); Serial.print(scoopUs, 1); Serial.println(F("f;"));
+  Serial.print(F("const float ARM_R_CAL_US = ")); Serial.print(r, 1); Serial.println(F("f;"));
+  Serial.print(F("const float ARM_L_CAL_US = ")); Serial.print(l, 1); Serial.println(F("f;"));
+  Serial.print(F("const float SCOOP_CAL_US = ")); Serial.print(s, 1); Serial.println(F("f;"));
   Serial.println(F("-------------------------------------------------------------------------------------------"));
 }
 
@@ -92,11 +102,8 @@ void help() {
   Serial.println(F("# cal | level | r/l/s <us> | r+ r- l+ l- s+ s- | a+ a- (both arm) | step <us> | off/on r|l|s|all | p | ?"));
 }
 
-// "level" pose: arm vertical (0 deg), scoop 0 deg (blade level, like the CAD)
-float refR, refL, refS;      // reference pulses (kept so 'cal' returns there)
-bool atLevel = false;
-
 void goLevel() {
+  if (atLevel) { show(); return; }   // already there: don't re-offset from the level pulses
   refR = armRUs; refL = armLUs; refS = scoopUs;
   armRUs = refR + ARM_R_DIR * ARM_US_PER_DEG * (0.0f - CAL_ARM_DEG);
   armLUs = refL + ARM_L_DIR * ARM_US_PER_DEG * (0.0f - CAL_ARM_DEG);
