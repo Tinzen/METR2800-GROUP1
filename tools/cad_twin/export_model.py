@@ -16,13 +16,20 @@ def colour(name, owner_name, grp):
     if 'switch' in n: return 'red'
     return 'black'
 SKIP = re.compile(r'(screw|hex nut|luosi|_9019|_9139|_9012|snap ring)', re.I)
+# drop parts that float free of the rest of the model (e.g. a stray standoff left in the CAD)
+_B = [(pts(i).min(0), pts(i).max(0)) for i in range(len(M))]
+ISOLATED = set()
+for _i, (_lo, _hi) in enumerate(_B):
+    _gap = min(np.linalg.norm(np.maximum(0, np.maximum(_lo - _B[j][1], _B[j][0] - _hi))) for j in range(len(M)) if j != _i)
+    if _gap > 30: ISOLATED.add(_i)
+print('removed isolated meshes:', [(i, M[i]['name']) for i in sorted(ISOLATED)])
 bodies = collections.defaultdict(lambda: collections.defaultdict(lambda: [[], []]))  # body -> colour -> [pos list, idx list]
 stats = collections.Counter(); kept = 0; dropped = 0
 for i in range(len(M)):
     m = M[i]; g = groups[i]; p = pts(i)
     idx = np.frombuffer(raw, np.uint32, m['ni'], m['iOff']).reshape(-1, 3).astype(np.int64)
     diag = np.linalg.norm(p.max(0) - p.min(0))
-    if SKIP.search(m['name'] or '') or diag < 6: dropped += 1; continue
+    if SKIP.search(m['name'] or '') or diag < 6 or i in ISOLATED: dropped += 1; continue
     nt = len(idx)
     # weld duplicate vertices so the decimator sees connected surfaces
     q = np.round(p * 100).astype(np.int64)

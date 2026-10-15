@@ -49,6 +49,9 @@ class MotorController {
     void setTarget(float targetPosition);
     void setTarget(float targetPosition, int maxPwm);
     void setTargetPID(float targetPosition, int maxPwm);
+    // Profiled move that may start and/or end moving (speeds >= 0, units/s),
+    // so consecutive moves blend without stopping.
+    void setTargetBlend(float targetPosition, int maxPwm, float startVel, float endVel);
 
     void moveRelative(float deltaPosition);
     void moveRelative(float deltaPosition, int maxPwm);
@@ -67,6 +70,7 @@ class MotorController {
     bool isAtTarget();
     bool isProfileFinished() const;
     float getProfileTotalTime() const;   // V2.1: seconds for the current move
+    float getProfileProgress() const;    // 0..1 of the current move
     UnitMode getUnitMode() const;
     MotorMode getMode() const;       // V2.1
 

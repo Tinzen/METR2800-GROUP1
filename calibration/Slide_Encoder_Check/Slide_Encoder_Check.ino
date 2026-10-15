@@ -25,7 +25,7 @@
 
 #include <Encoder.h>
 
-const int MOTOR_A = 6, MOTOR_B = 7, MOTOR_PWM = 11;   // same pins as V2_1
+const int MOTOR_A = 8, MOTOR_B = 9, MOTOR_PWM = 11;   // same pins as V2_1
 Encoder enc(2, 3);                                     // encoder on D2 / D3
 
 const int PULSE_PWM = 100;   // 0-255, keep low for testing

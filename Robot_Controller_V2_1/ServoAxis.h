@@ -4,68 +4,72 @@
 #include <Arduino.h>
 #include "MotionProfile.h"
 
-// One profiled "axis" driven by hobby servo(s), using the same MotionProfile
-// class as the v1 intake motor.
+// One servo "axis" (the arm pair, or the scoop), in DEGREES.
 //
-// There is no position feedback, so the profile is the commanded trajectory.
-// If the limits are faster than the servo can physically move, the servo lags
-// behind the profile and you lose the smooth start and stop. Tune the limits
-// below the servo's loaded speed.
+// Three ways to move:
+//   moveTo(t)     profiled (smooth start/stop) at setLimits() speed/accel
+//   instantTo(t)  jump: send the target at once, the servo moves at its own
+//                 speed (V2 behaviour). Arrival is estimated from
+//                 setNativeSpeed() because a hobby servo can't report back.
+//   jumpTo(v)     set the command directly (the step runner uses this for
+//                 timed / coordinated moves it computes itself)
 //
-// The axis works in whatever units the writer function expects:
-//   arm   -> 0..1000 position (mirrored onto both arm servos)
-//   scoop -> pulse width in microseconds
-//
-// Optional vibration adds +/-amplitude on top of the command, toggling every
-// halfPeriodMs (same behaviour as v1 vibrateServo()).
-typedef void (*ServoWriteFn)(int value);
+// The writer callback converts degrees to pulse widths (calibration lives
+// in the .ino), so this class knows nothing about microseconds.
+typedef void (*ServoWriteFn)(float degrees);
 
 class ServoAxis {
   public:
-    ServoAxis(ServoWriteFn writer, int minValue, int maxValue);
+    ServoAxis(ServoWriteFn writer, float minDeg, float maxDeg);
 
-    void setLimits(float maxVelocity, float maxAcceleration); // units/s, units/s^2
-    void setWriteInterval(unsigned long ms);   // min ms between servo writes
+    void setLimits(float maxVelocity, float maxAcceleration);  // deg/s, deg/s^2
+    void setNativeSpeed(float degPerSec);                        // for instantTo()
+    void setWriteInterval(unsigned long ms);
 
-    void begin(int startValue);       // write immediately, no profile
-    void moveTo(int targetValue);     // profiled move from the current command
-    void jumpTo(int value);           // set command directly (coordinated paths)
+    void begin(float startDeg);       // write now, no motion
+    void moveTo(float targetDeg);
+    void instantTo(float targetDeg);
+    void jumpTo(float deg);
 
-    void startVibration(int amplitude, unsigned int halfPeriodMs);
+    void startVibration(float amplitudeDeg, unsigned int halfPeriodMs);
     void stopVibration();
 
     void update();                    // call every loop()
 
-    bool isFinished() const;          // profile complete
+    bool isFinished() const;          // move complete (estimated for instantTo)
+    float getProgress() const;        // 0..1 of the current move
     bool isVibrating() const;
-    int getTarget() const;
-    int getCommand() const;           // profiled command, no vibration
-    int getOutput() const;            // last value written (incl. vibration)
-    float getVelocity() const;        // profile velocity, units/s
+    float getTarget() const;
+    float getCommand() const;         // best estimate of where the servo is (no vibration)
+    float getOutput() const;          // last value written (incl. vibration)
 
   private:
+    enum Mode { IDLE, PROFILE, INSTANT };
     ServoWriteFn writeFn;
     MotionProfile profile;
-    int minVal;
-    int maxVal;
+    float minVal, maxVal;
+    float nativeSpeed;
 
-    int target;
+    Mode mode;
+    float target;
     float command;
-    bool profiling;
+    float instantFrom;
+    unsigned long instantStartMs;
+    unsigned long instantDurMs;
 
-    int lastWritten;
+    float lastWritten;
     unsigned long lastWriteMs;
     unsigned long writeIntervalMs;
     bool hasWritten;
 
     bool vibrating;
-    int vibAmplitude;
+    float vibAmplitude;
     unsigned int vibHalfPeriodMs;
     unsigned long vibLastToggleMs;
     bool vibPositive;
 
-    int clampValue(long value) const;
-    void writeNow(int value);
+    float clampValue(float v) const;
+    void writeNow(float v);
 };
 
 #endif

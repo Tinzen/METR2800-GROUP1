@@ -1,0 +1,1830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important} body{margin:0} img{max-width:100%}</style>
+<title>DOVER Sequence Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Saira+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: same drafting-table console as the run viewer. Twin + side tabs on top, timeline across, the step table (the state machine) below. One column on phones. */
+:root {
+  --bg: #eef0ec;
+  --panel: #fbfbf9;
+  --ink: #161714;
+  --ink-2: #4f504b;
+  --muted: #7b7c75;
+  --grid: #e2e3dc;
+  --line: rgba(22,23,20,0.12);
+  --accent: #a87400;
+  --accent-soft: rgba(168,116,0,0.14);
+  --arm: #2a78d6; --scoop: #eb6834; --slide: #1baf7a; --vib: #6250d6;
+  --hold: #1f9d4c; --level: #d6a514; --pour: #d03b3b;
+  --bad: #d03b3b; --bad-soft: rgba(208,59,59,0.12);
+  --f-display: "Saira Semi Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111311; --panel: #1a1b19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8e8e86;
+    --grid: #2a2b28; --line: rgba(255,255,255,0.10);
+    --accent: #e3a92c; --accent-soft: rgba(227,169,44,0.16);
+    --arm: #3987e5; --scoop: #e0743f; --slide: #22b583; --vib: #9085e9;
+    --hold: #2fb862; --level: #e0b42a; --pour: #e66767; --bad: #e66767; --bad-soft: rgba(230,103,103,0.16);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111311; --panel: #1a1b19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8e8e86;
+  --grid: #2a2b28; --line: rgba(255,255,255,0.10);
+  --accent: #e3a92c; --accent-soft: rgba(227,169,44,0.16);
+  --arm: #3987e5; --scoop: #e0743f; --slide: #22b583; --vib: #9085e9;
+  --hold: #2fb862; --level: #e0b42a; --pour: #e66767; --bad: #e66767; --bad-soft: rgba(230,103,103,0.16);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 14px; line-height: 1.45; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+p { margin: 0; }
+.num, input.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+button, select, input { font: inherit; color: inherit; }
+button, select { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 10px; cursor: pointer; }
+button:hover:not(:disabled), select:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+:root[data-theme="dark"] button.primary { color: #111311; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #111311; } }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="text"], input[type="number"], input:not([type]) { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; min-width: 0; }
+input.bad { border-color: var(--bad); background: var(--bad-soft); }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-in, .wrap { max-width: 1560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { padding-block: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; min-width: 0; }
+.brand h1 { font-size: 21px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.filechip { font-family: var(--f-data); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46ch; }
+.filechip b { color: var(--ink-2); font-weight: 500; }
+.dirty::after { content: " ●"; color: var(--accent); }
+.total { display: flex; align-items: baseline; gap: 6px; }
+.total .big { font-family: var(--f-data); font-size: 22px; font-weight: 500; }
+.total .lab { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.wrap { padding-block: 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.pad { padding: 12px 14px; }
+.row-top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .row-top { grid-template-columns: 1fr; } }
+
+/* twin */
+.twin { display: flex; flex-direction: column; min-width: 0; }
+.twin-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.twin-head h2 { margin-right: auto; }
+.stage { position: relative; aspect-ratio: 16 / 10; max-width: 100%; }
+.stage canvas { width: 100%; height: 100%; display: block; border-radius: 0 0 var(--r) var(--r); }
+.hud { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+.hud .stepname { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: 0.05em; text-transform: uppercase; background: var(--panel); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); align-self: flex-start; }
+.hud .vals { font-family: var(--f-data); font-size: 12px; background: var(--panel); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.hud .vals i { font-style: normal; color: var(--muted); }
+.holdtag { font-family: var(--f-data); font-size: 12px; padding: 2px 8px; border-radius: 99px; align-self: flex-start; color: #fff; }
+.nowebgl { padding: 40px 16px; color: var(--muted); text-align: center; }
+.stagebar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; padding: 4px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); max-width: calc(100% - 20px); }
+.stagebar button { border: none; background: transparent; padding: 5px 7px; border-radius: 99px; display: grid; place-items: center; }
+.stagebar button:hover { background: var(--accent-soft); }
+.stagebar button.play { background: var(--accent); color: #fff; width: 34px; height: 34px; }
+.stagebar svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+.stagebar .num { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.stagebar select { border: none; padding: 2px 4px; font-size: 12px; background: transparent; }
+.camhelp { font-size: 11.5px; color: var(--muted); padding: 6px 14px 8px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.camhelp b { color: var(--ink-2); font-weight: 600; }
+/* step inspector */
+.insp { display: flex; flex-direction: column; gap: 12px; }
+.insp-head { display: flex; align-items: center; gap: 6px; }
+.insp-head input { font-weight: 600; font-family: var(--f-data); flex: 1; min-width: 0; }
+.insp-head button { padding: 3px 9px; }
+.story { font-size: 13.5px; line-height: 1.5; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; }
+.story .t { display: block; font-family: var(--f-data); font-size: 12px; color: var(--muted); margin-top: 4px; }
+.ictl { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 6px 8px; align-items: center; }
+.ictl > label, .ictl > .lab { font-family: var(--f-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; color: var(--ink-2); }
+.ictl .pair { display: flex; gap: 6px; min-width: 0; }
+.ictl .pair select { flex: 1; min-width: 0; }
+.ictl .pair input { width: 84px; }
+.choices { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.choices label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.choices input[type="number"] { width: 72px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+table.steps td.what { min-width: 200px; max-width: 290px; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); cursor: pointer; }
+table.steps td.what:hover { color: var(--ink); }
+table.steps .grip { cursor: grab; color: var(--muted); padding: 2px 5px 2px 0; touch-action: none; user-select: none; font-size: 14px; }
+table.steps .grip:hover { color: var(--accent); }
+table.steps tr.dragging td { opacity: 0.45; }
+table.steps tr.drop-before td { box-shadow: inset 0 3px 0 var(--accent) !important; }
+table.steps tr.drop-after td { box-shadow: inset 0 -3px 0 var(--accent) !important; }
+body.rowdrag, body.rowdrag * { cursor: grabbing !important; user-select: none; }
+.tl-hint { font-size: 11.5px; color: var(--muted); }
+table.steps input.idle { color: var(--muted); background: transparent; border-style: dashed; }
+.warn { color: var(--level); font-weight: 600; }
+
+/* side tabs */
+.side { min-width: 0; display: flex; flex-direction: column; }
+.tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; font-family: var(--f-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 13px; padding: 8px 10px; color: var(--muted); white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabpane { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; max-height: 640px; overflow-y: auto; }
+.vgroup { display: flex; flex-direction: column; gap: 6px; }
+.vgroup-head { display: flex; align-items: center; gap: 8px; }
+.vgroup-head h3 { margin-right: auto; }
+.vrow { display: grid; grid-template-columns: minmax(84px, 1.1fr) minmax(64px, 0.8fr) minmax(0, 1.2fr) auto; gap: 6px; align-items: center; }
+.vrow .nm { font-family: var(--f-data); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+.vrow .us { font-family: var(--f-data); font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrow .acts { display: flex; gap: 4px; }
+.vrow .acts button { padding: 2px 7px; font-size: 12px; }
+.hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.hint code, .mono { font-family: var(--f-data); font-size: 12px; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 10px; border-radius: 0 4px 4px 0; font-size: 13px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; align-items: center; }
+.kv label { color: var(--ink-2); }
+.live-state { font-family: var(--f-data); font-size: 12px; }
+.slider-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 70px; gap: 8px; align-items: center; }
+.slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.console { font-family: var(--f-data); font-size: 11.5px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+.steps-ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+
+/* timeline */
+.timeline { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.tl-head h2 { margin-right: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.legend i.sq { height: 10px; width: 10px; border-radius: 2px; }
+#tl { width: 100%; height: 230px; display: block; cursor: crosshair; touch-action: none; }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.transport input[type="range"] { flex: 1 1 200px; accent-color: var(--accent); }
+.transport .num { min-width: 7ch; text-align: right; }
+
+/* step table */
+.seq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.seq-head h2 { margin-right: auto; }
+.tablewrap { overflow-x: auto; }
+table.steps { border-collapse: collapse; width: 100%; min-width: 1720px; font-size: 13px; }
+table.steps th { text-align: left; font-family: var(--f-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11.5px; color: var(--muted); padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.steps td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.steps tr.sel td { background: var(--accent-soft); }
+table.steps tr.play td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.steps td input { width: 100%; font-family: var(--f-data); font-size: 12.5px; }
+table.steps td.idx { font-family: var(--f-data); color: var(--muted); width: 28px; cursor: pointer; }
+table.steps td.time { font-family: var(--f-data); font-size: 12px; color: var(--ink-2); white-space: nowrap; text-align: right; }
+table.steps td.acts { white-space: nowrap; }
+table.steps td.acts button { padding: 2px 6px; font-size: 12px; }
+table.steps td.note input { font-family: var(--f-body); color: var(--ink-2); }
+.waitcell { display: grid; grid-template-columns: minmax(118px, 1.3fr) minmax(56px, 0.7fr); gap: 4px; }
+.waitcell select { padding: 3px 4px; font-size: 12px; }
+.errors { color: var(--bad); font-size: 13px; padding: 0 14px 10px; }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: var(--r); font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 20; max-width: 80vw; }
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+@media (max-width: 640px) { .brand h1 { font-size: 18px; } .total .big { font-size: 18px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><h1>Dover sequence</h1><span id="fileChip" class="filechip">built-in snapshot</span></div>
+    <div class="total"><span class="lab">Predicted run</span><span id="totalTime" class="big">–</span></div>
+    <div class="btns">
+      <button id="btnOpenDir" title="Pick the Robot_Controller_V2_1 folder: opens Sequence.h and RobotConfig.h, saves back to them">Open robot folder</button>
+      <button id="btnOpenFile" title="Open a Sequence.h file">Open file</button>
+      <button id="btnSave" class="primary" title="Save to the open file (Ctrl+S)">Save</button>
+      <button id="btnCopy" title="Copy Sequence.h text to the clipboard">Copy</button>
+      <button id="btnDownload" title="Download Sequence.h">Download</button>
+      <input id="fileInput" type="file" accept=".h,.txt" hidden>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="row-top">
+    <section class="panel twin" aria-label="3D twin">
+      <div class="twin-head">
+        <h2>Twin</h2>
+        <label class="hint" for="viewSel">View</label>
+        <select id="viewSel"><option value="robot">Robot</option><option value="side">Side</option><option value="track">Field</option></select>
+        <label class="hint" for="tiltIn">Slide tilt</label>
+        <input id="tiltIn" class="num" type="number" step="0.5" style="width:70px" title="Degrees below the CAD slide angle (32°). 14.9 puts the bucket on the hopper rim. Measure the real angle.">
+      </div>
+      <div class="stage">
+        <canvas id="twin3d" aria-label="3D model of the robot at the current time"></canvas>
+        <div class="hud">
+          <div id="hudStep" class="stepname">–</div>
+          <div id="hudVals" class="vals"></div>
+          <div id="hudHold" class="holdtag"></div>
+        </div>
+        <div class="stagebar" role="group" aria-label="Play the sequence">
+          <button id="tbPrev" title="Previous step" aria-label="Previous step"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+          <button id="tbPlay" class="play" title="Play / pause (space)" aria-label="Play"><svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg></button>
+          <button id="tbNext" title="Next step" aria-label="Next step"><svg viewBox="0 0 16 16"><path d="M11 2h2v12h-2zM2 2v12l8-6z"/></svg></button>
+          <span id="tbTime" class="num">0.00 s</span>
+          <select id="tbRate" aria-label="Playback speed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option></select>
+        </div>
+      </div>
+      <div class="camhelp"><span><b>Scroll</b> zoom at cursor</span><span><b>Middle-drag</b> pan</span><span><b>Shift + middle-drag</b> orbit</span><span><b>Double-click</b> fit</span><span>Left-drag orbits, Shift + left-drag pans (trackpads)</span>
+        <label style="margin-left:auto"><input id="revZoom" type="checkbox"> Reverse zoom</label></div>
+    </section>
+
+    <section class="panel side" aria-label="Values, live link and calibration">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-step" aria-selected="false" data-pane="pane-step">Step</button>
+        <button role="tab" id="tab-values" aria-selected="true" data-pane="pane-values">Angles &amp; values</button>
+        <button role="tab" id="tab-live" aria-selected="false" data-pane="pane-live">Jog &amp; live link</button>
+        <button role="tab" id="tab-cal" aria-selected="false" data-pane="pane-cal">Calibration</button>
+        <button role="tab" id="tab-help" aria-selected="false" data-pane="pane-help">How to</button>
+      </div>
+      <div id="pane-step" class="tabpane" role="tabpanel" hidden></div>
+      <div id="pane-values" class="tabpane" role="tabpanel"></div>
+      <div id="pane-live" class="tabpane" role="tabpanel" hidden>
+        <div class="vgroup">
+          <h3>Jog the twin</h3>
+          <p class="hint">Works with no robot: pose the twin, then Capture the pose into an angle or slide position. When the robot is connected the arm and scoop follow too.</p>
+          <div class="slider-row"><span class="mono" style="color:var(--arm)">ARM</span><input id="jogArm" type="range" min="-55" max="125" step="0.5" value="-47.4" aria-label="Arm angle"><input id="jogArmN" class="num" type="number" step="0.5" value="-47.4" aria-label="Arm angle, degrees"></div>
+          <div class="slider-row"><span class="mono" style="color:var(--scoop)">SCOOP</span><input id="jogScoop" type="range" min="-260" max="20" step="0.5" value="-9.4" aria-label="Scoop angle"><input id="jogScoopN" class="num" type="number" step="0.5" value="-9.4" aria-label="Scoop angle, degrees"></div>
+          <div class="slider-row"><span class="mono" style="color:var(--slide)">SLIDES</span><input id="jogSlide" type="range" min="0" max="2200" step="5" value="0" aria-label="Slide position"><input id="jogSlideN" class="num" type="number" step="5" value="0" aria-label="Slide position, mm"></div>
+          <div class="btns"><button id="btnJogFromT" title="Set the sliders to the pose at the playhead">Pose at playhead</button><label class="hint" for="capSel">Capture into</label><select id="capSel"></select><button id="btnCapture" class="primary">Capture</button></div>
+          <div id="jogHold" class="hint"></div>
+        </div>
+        <div class="vgroup">
+          <h3>Live link to the robot</h3>
+          <div class="callout">Upload V2.1 with <span class="mono">RUN_MODE = RUN_CONSOLE</span> first. Connecting resets the Nano; in RUN_FULL it would start a run. Battery on, Arduino serial monitor closed. Chrome or Edge only.</div>
+          <div class="btns"><button id="btnConnect">Connect robot</button><button id="btnDisconnect" disabled>Disconnect</button><button id="btnSendSlide" disabled title="Moves the real slides to the slider position at 300 mm/s">Send slides</button><span id="liveState" class="live-state hint">not connected</span></div>
+        </div>
+        <div class="vgroup">
+          <h3>Run on the robot</h3>
+          <div class="btns">
+            <button id="btnRunAll" disabled>Run all (g)</button>
+            <button id="btnRunSel" disabled>Run from selected (r)</button>
+            <button id="btnStepMode" disabled>Step mode (t)</button>
+            <button id="btnNext" disabled>Next step (n)</button>
+            <button id="btnStop" disabled>Stop (x)</button>
+          </div>
+          <div class="btns"><label class="hint" for="speedSel">Speed</label><select id="speedSel" disabled><option value="100">100%</option><option value="50">50%</option><option value="25">25%</option></select></div>
+          <p class="hint">The robot runs the sequence it was uploaded with. Save and re-upload after editing.</p>
+        </div>
+        <div class="vgroup"><h3>Serial</h3><div id="console" class="console" aria-live="polite"></div></div>
+      </div>
+      <div id="pane-cal" class="tabpane" role="tabpanel" hidden></div>
+      <div id="pane-help" class="tabpane" role="tabpanel" hidden>
+        <ol class="steps-ol">
+          <li><b>Open robot folder</b> and pick the repo (or <span class="mono">Robot_Controller_V2_1</span>). Save writes straight back to <span class="mono">Sequence.h</span> and <span class="mono">RobotConfig.h</span>.</li>
+          <li><b>Watch it:</b> the play button on the twin (or Space). ‹ › (or the arrow keys) jump one step. The strip under the timeline shows whether the scoop holds rocks (green), is level (yellow) or pours (red).</li>
+          <li><b>Change what a step does:</b> click its number or description. The <b>Step</b> tab says what it does in plain words and lets you change it with menus. Drag the edge between two blocks on the timeline to change how long a step takes; drag ⠿ in the table to reorder.</li>
+          <li><b>Change a pose:</b> <b>Angles &amp; values</b> → <b>Show</b> on a name, then <b>Jog</b> the sliders until the twin looks right → <b>Capture</b>. No robot needed. While you edit or jog, the grey ghost shows the value as it is now.</li>
+          <li><b>Save</b> (Ctrl+S), upload <span class="mono">Robot_Controller_V2_1.ino</span>, then check on the real robot: the same sliders move it when the live link is connected.</li>
+        </ol>
+        <p class="hint">Full walkthrough: <span class="mono">SEQUENCE_TUNING.md</span> in the repo. The twin's angles are only as good as the servo calibration (Calibration tab).</p>
+        <p class="hint">3D view (Fusion 360 / Inventor): scroll zooms at the cursor, middle-drag pans, Shift + middle-drag orbits about the point under the cursor, double-click fits the robot.</p>
+        <p class="hint">Step rules: ARM / SCOOP take an angle name, a number or HOLD. HOLD keeps whatever that axis is doing, so a move started earlier keeps going. MOVE is INSTANT (V2 jump), PROFILED (smooth) or a time in ms (arm and scoop finish together; ARM VIA makes the arm go through that angle halfway). NEXT WHEN decides when the next step starts. Two slide steps in a row in the same direction blend without stopping.</p>
+        <p class="hint">Without the folder (other browsers): edit, then Download or Copy and replace <span class="mono">Sequence.h</span>. Tell your agent if you did, so the files stay in sync.</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel timeline" aria-label="Timeline">
+    <div class="tl-head">
+      <h2>Timeline</h2>
+      <span class="tl-hint">Drag the edge between two steps to change how long the first one takes (Esc cancels).</span>
+      <div class="legend">
+        <span><i style="background:var(--arm)"></i>Arm °</span>
+        <span><i style="background:var(--scoop)"></i>Scoop °</span>
+        <span><i style="background:var(--slide)"></i>Slides mm</span>
+        <span><i class="sq" style="background:var(--hold)"></i>holds</span>
+        <span><i class="sq" style="background:var(--level)"></i>level</span>
+        <span><i class="sq" style="background:var(--pour)"></i>pours</span>
+      </div>
+    </div>
+    <canvas id="tl" aria-label="Step timeline with arm, scoop and slide traces"></canvas>
+    <div class="transport">
+      <button id="btnPlay" aria-label="Play">Play</button>
+      <select id="playRate" aria-label="Playback speed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option></select>
+      <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Time">
+      <span id="tNow" class="num">0.00 s</span>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Sequence steps">
+    <div class="seq-head">
+      <h2>Steps</h2>
+      <span class="hint">Click a step's number or description to edit it in the Step tab. Drag ⠿ to reorder. Faded cells are HOLD (that axis carries on).</span>
+      <select id="addStepSel" aria-label="Add a step">
+        <option value="">Add step…</option>
+        <option value="arm">Move the arm</option>
+        <option value="scoop">Move the scoop</option>
+        <option value="both">Arm + scoop together (timed)</option>
+        <option value="slides">Move the slides</option>
+        <option value="vib">Vibrate the scoop</option>
+        <option value="wait">Wait</option>
+        <option value="blank">Blank step</option>
+      </select>
+    </div>
+    <div id="errors" class="errors" hidden></div>
+    <div class="tablewrap"><table class="steps" id="stepTable"></table></div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<datalist id="dl-arm"></datalist><datalist id="dl-scoop"></datalist><datalist id="dl-slide"></datalist>
+<datalist id="dl-speed"></datalist><datalist id="dl-move"><option value="INSTANT"></option><option value="PROFILED"></option><option value="1000"></option></datalist>
+<datalist id="dl-vib"></datalist><datalist id="dl-via"></datalist>
+
+<script type="text/plain" id="snap-seq">// =============================================================================
+//  DOVER SEQUENCE  -  the robot's state machine. One row = one step.
+//
+//  Edit here, or open this file in tools/sequence_editor.html (it shows the
+//  3D twin and the timing, and saves straight back to this file).
+//  Whichever was edited last wins: see AGENTS.md "Sequence sync".
+//
+//  ANGLES   ARM:   degrees forward of vertical (+ = out toward the intake floor)
+//           SCOOP: degrees relative to the arm (0 = CAD pose: blade flat on top, arm vertical)
+//  SLIDES   mm from fully retracted.   SPEEDS deg/s, mm/s.   TIMES ms.
+// =============================================================================
+#pragma once
+#include "SequenceTypes.h"
+
+// ---- ARM ANGLES (deg) -------------------------------------------------------
+const float A_START    =  -47.4f;  // power-on pose (V2 940)
+const float A_DOWN     =  100.6f;  // V2 200
+const float A_PEAK     =   70.6f;  // sweep lifts to here halfway (V2 350)
+const float A_SCOOP    =  110.6f;  // sweep ends here: scoop flat on the floor (V2 150)
+const float A_TRANSFER =  -43.4f;  // over the bucket (V2 920)
+const float A_MOVE     =   40.6f;  // clear of the slides (V2 500)
+
+// ---- SCOOP ANGLES (deg) -----------------------------------------------------
+const float S_START    =   -9.4f;  // power-on pose (V2 2300 us)
+const float S_DOWN     = -249.4f;  // V2 700 us
+const float S_SCOOP    =  -69.4f;  // end of sweep: blade flat on the floor (V2 1900 us)
+const float S_PICKUP   =  -39.4f;  // lip up (V2 2100 us)
+const float S_CARRY    =  -84.4f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
+const float S_POUR     = -104.4f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
+
+// ---- SLIDE POSITIONS (mm) ---------------------------------------------------
+const float X_CREEP    =  450.0f;  // slow down here, just before the bucket touches the pole
+const float X_TIP      =  530.0f;  // bucket fully tipped   (SAFE PLACEHOLDERS: CAD says ~1650 / ~1740)
+
+// ---- SPEEDS -----------------------------------------------------------------
+const float ARM_SPEED   =  300.0f; // deg/s     (PROFILED moves)
+const float ARM_ACCEL   = 1600.0f; // deg/s^2
+const float SCOOP_SPEED =  450.0f; // deg/s
+const float SCOOP_ACCEL = 2250.0f; // deg/s^2
+const float SLIDE_FAST  = 1000.0f; // mm/s
+const float SLIDE_CREEP =  100.0f; // mm/s      bucket tips slowly at this speed
+const float SLIDE_MAX   = 1100.0f; // mm/s      (free speed ~1480, keep under ~1170)
+const float SLIDE_ACCEL = 3000.0f; // mm/s^2
+
+// ---- VIBRATION / TIMED MOVES ------------------------------------------------
+const float VIBRATE_DEG = 7.5f;            // +/- deg (V1 ~ +/-50 us)
+const int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1
+const float TIMED_MOVE_EASE = 0.0f;        // 0 = constant speed (V2 sweep), 0.25 = smooth start/stop
+
+// ---- SEQUENCE ---------------------------------------------------------------
+// ARM / SCOOP: angle name, a number, or HOLD.   SLIDE: mm, a name, or HOLD.
+// MOVE: INSTANT (V2 jump), PROFILED (smooth), or ms (timed: arm + scoop finish together).
+// NEXT WHEN: WAIT_MS(ms) | WAIT_ARRIVED(ms) | WAIT_ARM(%) | WAIT_SLIDE(%)
+// A move still running when its step ends keeps going (that's how steps overlap).
+const Step SEQUENCE[] PROGMEM = {
+//  STEP           ARM          SCOOP      SLIDE     SLIDE mm/s   MOVE      ARM VIA  VIBRATE      NEXT WHEN
+  { "SCOOP_DOWN",  HOLD,        S_DOWN,    HOLD,     0,           INSTANT,  NONE,    0,           WAIT_MS(500)     },  // V2: scoop first
+  { "ARM_DOWN",    A_DOWN,      HOLD,      HOLD,     0,           INSTANT,  NONE,    0,           WAIT_MS(500)     },  // V2
+  { "SWEEP",       A_SCOOP,     S_SCOOP,   HOLD,     0,           2000,     A_PEAK,  0,           WAIT_ARRIVED(0)  },  // V2 scoopSweep
+  { "PICKUP",      HOLD,        S_PICKUP,  HOLD,     0,           INSTANT,  NONE,    0,           WAIT_MS(1000)    },  // V2 (V1 used 100 ms)
+  { "LIFT",        A_TRANSFER,  HOLD,      HOLD,     0,           1000,     NONE,    0,           WAIT_MS(500)     },  // V1: 1 s lift, scoop still at pickup
+  { "CARRY",       HOLD,        S_CARRY,   HOLD,     0,           PROFILED, NONE,    0,           WAIT_ARM(90)     },  // V1: carry angle until nearly up
+  { "POUR",        HOLD,        S_POUR,    HOLD,     0,           PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // V1: tip into the bucket
+  { "VIBRATE",     HOLD,        HOLD,      HOLD,     0,           PROFILED, NONE,    VIBRATE_DEG, WAIT_MS(1000)    },  // V1: shake the rest out
+  { "EXTEND",      A_MOVE,      HOLD,      X_CREEP,  SLIDE_FAST,  PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // arm clears while slides go
+  { "CREEP",       HOLD,        HOLD,      X_TIP,    SLIDE_CREEP, PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // blends from fast, no stop
+  { "TIP_HOLD",    HOLD,        HOLD,      HOLD,     0,           PROFILED, NONE,    0,           WAIT_MS(300)     },  // let the rocks fall
+  { "RETRACT",     HOLD,        HOLD,      0,        SLIDE_MAX,   PROFILED, NONE,    0,           WAIT_ARRIVED(0)  },  // back in at max speed
+};
+</script>
+<script type="text/plain" id="snap-cfg">// =============================================================================
+//  ROBOT CONFIG  -  what the robot IS: pins, gear ratios, servo calibration,
+//  slide gains and safety limits.  What the robot DOES is in Sequence.h.
+//
+//  Every number here must match ROBOT_SPECS.md. Change the spec first.
+// =============================================================================
+#pragma once
+#include <Arduino.h>
+
+// ---- PINS ---------------------------------------------------------------------
+const int OUTTAKE_MA = 8;          // motor driver IN1   (confirmed 14 Oct)
+const int OUTTAKE_MB = 9;          // motor driver IN2
+const int OUTTAKE_PWM = 11;        // motor driver PWM
+const int OUTTAKE_ENC_A = 2;       // encoder: must stay on D2/D3 (interrupt pins)
+const int OUTTAKE_ENC_B = 3;
+const int END_LED_PIN = LED_BUILTIN;   // R25 end-of-run light (wire a bright external LED here)
+
+// PCA9685 outputs, 1-based like the board's silkscreen (code subtracts 1)
+const int ARM_R_OUTPUT = 1;
+const int ARM_L_OUTPUT = 2;
+const int SCOOP_OUTPUT = 3;
+
+// ---- SLIDE DRIVETRAIN  (gear-ratio change = edit SLIDE_STEP_UP only) -----------
+const float SLIDE_COUNTS_PER_MOTOR_REV = 384.5f;   // goBILDA 5203 435 rpm, encoder before the step-up
+const float SLIDE_STEP_UP = 1.8f;                  // spool turns this many times per motor turn
+const float SLIDE_SPOOL_DIA_MM = 36.15f;           // measured
+const float SLIDE_STRINGING = 1.0f;                // mm of slide per mm of string (1:1)
+const float SLIDE_MOTOR_FREE_RPM = 435.0f;         // at 12 V
+const float SLIDE_MM_PER_COUNT =
+    3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING / (SLIDE_COUNTS_PER_MOTOR_REV / SLIDE_STEP_UP);   // 0.5317
+const float SLIDE_FREE_SPEED_MM_S =
+    SLIDE_MOTOR_FREE_RPM / 60.0f * SLIDE_STEP_UP * 3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING; // ~1480
+
+const int SLIDE_ENCODER_DIR = -1;  // raw count goes negative on extend (tested 14 Oct)
+const int SLIDE_MOTOR_DIR = 1;     // + PWM must EXTEND   (UNCONFIRMED: check with 'j 100 300')
+
+// Slide gains are in ENCODER COUNTS (motor side), so they stay valid when the
+// gear ratio changes (only KG / KA need a recheck). Tune with calibration/Slide_PID_Tune.
+const float SLIDE_KP = 0.4f;       // PWM per count of error
+const float SLIDE_KI = 0.0f;
+const float SLIDE_KD = 0.0f;
+const float SLIDE_KS = 12.0f;      // PWM to break static friction
+const float SLIDE_KV = 0.09f;      // PWM per count/s
+const float SLIDE_KA = 0.0f;       // PWM per count/s^2
+const float SLIDE_KG = 0.0f;       // constant PWM against gravity on the incline (+ = extend)
+const int   SLIDE_MAX_PWM = 250;
+const float SLIDE_TOLERANCE_MM = 1.5f;        // PID deadband
+const float SLIDE_ARRIVE_TOL_MM = 12.0f;      // "close enough" to finish a step
+const float SLIDE_SETTLED_TOL_MM = 80.0f;     // stopped this close also counts (logs SETTLED_SHORT)
+
+// ---- SERVO CALIBRATION  (set by calibration/Servo_Offset_Cal) ------------------
+// Reference pose = scoop laid FLAT on the intake floor (a hard stop).
+// The CAD says that pose is ARM 110.6 deg, SCOOP -69.4 deg.
+const float CAL_ARM_DEG = 110.6f;
+const float CAL_SCOOP_DEG = -69.4f;
+// Pulse widths that put each servo at the reference pose. Set 15 Oct from Tinzen:
+// the V2 SCOOP pose (arm 150 = R 940 / L 2060 us, scoop 1900 us) lies flat on the
+// floor. Refine with calibration/Servo_Offset_Cal.
+const float ARM_R_CAL_US = 940.0f;
+const float ARM_L_CAL_US = 2060.0f;
+const float SCOOP_CAL_US = 1900.0f;
+// Scale: goBILDA 300 deg servos (2000 us / 300 deg). Arm goes through 40T:48T gears.
+const float ARM_US_PER_DEG = 8.0f;
+const float SCOOP_US_PER_DEG = 6.667f;
+const int ARM_R_DIR = -1;          // +arm degrees = shorter pulse on the right servo
+const int ARM_L_DIR = 1;
+const int SCOOP_DIR = 1;
+
+// Angle conventions:
+//   ARM   degrees forward of vertical (+ = out toward the intake floor)
+//   SCOOP degrees relative to the arm, 0 = the CAD pose (blade flat on top, arm vertical)
+const float ARM_MIN_DEG = -55.0f;
+const float ARM_MAX_DEG = 125.0f;
+const float SCOOP_MIN_DEG = -260.0f;
+const float SCOOP_MAX_DEG = 20.0f;
+const int PULSE_ABS_MIN = 500;     // hard clamp on any pulse (us)
+const int PULSE_ABS_MAX = 2500;
+const float SERVO_NATIVE_DEG_S = 430.0f;   // unloaded servo speed (estimate) for INSTANT moves
+const float ARM_GEAR_RATIO = 48.0f / 40.0f;// arm is slower than its servos by this much
+
+// ---- SAFETY -----------------------------------------------------------------------
+const int   STALL_MIN_PWM = 90;            // pushing this hard ...
+const float STALL_MAX_VEL = 50.0f;         // ... but slower than this (counts/s) ...
+const unsigned long STALL_TIME_MS = 200;   // ... for this long = stall
+const unsigned long STALL_IGNORE_START_MS = 300;
+const int   DIRCHECK_MIN_PWM = 80;         // wiring check: driving one way, running away the other
+const float DIRCHECK_MIN_VEL = 600.0f;     // counts/s
+const float DIRCHECK_MIN_ERR = 200.0f;     // counts
+const unsigned long DIRCHECK_TIME_MS = 150;
+const unsigned long SLIDE_TIMEOUT_MARGIN_MS = 1500;   // step fails after profile time + this
+const unsigned long RUN_WATCHDOG_MS = 60000;          // force DONE well before 120 s
+</script>
+<script type="text/plain" id="snap-date">15 Oct 2026</script>
+<script src="three.min.js"></script>
+<script src="twin_model.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const DEG = Math.PI / 180;
+const HOLD = "HOLD";
+const css = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+// ============================================================================
+// PARSE / WRITE Sequence.h and RobotConfig.h
+// ============================================================================
+const RE_CONST = /^(\s*const\s+(float|int)\s+)(\w+)(\s*=\s*)([-+]?[0-9.]+(?:[eE][-+]?\d+)?f?)(\s*;)(.*)$/;
+const RE_SECTION = /^\s*\/\/\s*-{3,}\s*(.+?)\s*-{3,}\s*$/;
+const STEP_FIELDS = ["arm", "scoop", "slide", "speed", "move", "via", "vib", "wait"];
+
+function parseHeader(text) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const consts = [];   // {name, type, value, group, line, comment}
+  let group = "", tStart = -1, tEnd = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const L = lines[i];
+    const sec = L.match(RE_SECTION);
+    if (sec) { group = sec[1]; continue; }
+    if (/const\s+Step\s+SEQUENCE\[\]/.test(L)) { tStart = i; continue; }
+    if (tStart >= 0 && tEnd < 0 && /^\s*\};/.test(L)) { tEnd = i; continue; }
+    if (tStart >= 0 && tEnd < 0) continue;
+    const m = L.match(RE_CONST);
+    if (m) consts.push({ name: m[3], type: m[2], value: parseFloat(m[5]), group, line: i, comment: (m[7].match(/\/\/\s?(.*)$/) || [, ""])[1] });
+  }
+  const steps = [];
+  if (tStart >= 0) {
+    for (let i = tStart + 1; i < (tEnd < 0 ? lines.length : tEnd); i++) {
+      const L = lines[i];
+      const m = L.match(/^\s*\{\s*"([^"]*)"\s*,(.*)\}\s*,?\s*(?:\/\/\s?(.*))?$/);
+      if (!m) continue;
+      const parts = splitTop(m[2]);
+      if (parts.length < 8) continue;
+      const w = parts[7].match(/(WAIT_\w+)\s*\(\s*(-?[\w.]+)\s*\)/);
+      steps.push({ name: m[1], arm: parts[0], scoop: parts[1], slide: parts[2], speed: parts[3], move: parts[4],
+                   via: parts[5], vib: parts[6], waitType: w ? w[1] : "WAIT_MS", waitVal: w ? w[2] : "0", note: (m[3] || "").trim() });
+    }
+  }
+  return { lines, consts, steps, tStart, tEnd };
+}
+function splitTop(s) {
+  const out = []; let depth = 0, cur = "";
+  for (const ch of s) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { out.push(cur.trim()); cur = ""; } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out.map((t) => t.replace(/(\d)f$/, "$1"));
+}
+function fmtNum(v, type) {
+  if (type === "int") return String(Math.round(v));
+  if (!isFinite(v)) return "0.0f";
+  let s = (Math.round(v * 1000) / 1000).toString();
+  if (!s.includes(".") && !s.includes("e")) s += ".0";
+  return s + "f";
+}
+function writeHeader(doc, consts, steps) {
+  const lines = doc.lines.slice();
+  const byLine = new Map();
+  for (const c of consts) if (c.line >= 0) byLine.set(c.line, c);
+  for (const [i, c] of byLine) {
+    const m = lines[i].match(RE_CONST); if (!m) continue;
+    if (parseFloat(m[5]) === c.value) continue;               // untouched: keep the line exactly
+    const newVal = fmtNum(c.value, c.type);
+    lines[i] = m[1] + m[3] + m[4] + newVal.padStart(m[5].length) + m[6] + m[7];
+  }
+  // new constants: insert after the last constant of their group
+  const extra = consts.filter((c) => c.line < 0);
+  const inserts = [];
+  for (const c of extra) {
+    const same = consts.filter((d) => d.group === c.group && d.line >= 0);
+    const after = same.length ? Math.max(...same.map((d) => d.line)) : (doc.tStart > 0 ? doc.tStart - 2 : lines.length - 1);
+    const txt = `const ${c.type} ${c.name.padEnd(10)} = ${fmtNum(c.value, c.type).padStart(8)};${c.comment ? "   // " + c.comment : ""}`;
+    inserts.push({ after, txt });
+  }
+  // table
+  let tStart = doc.tStart, tEnd = doc.tEnd;
+  const rows = tableRows(steps);
+  if (tStart >= 0 && tEnd > tStart) {
+    let headerIdx = -1;
+    for (let i = tStart + 1; i < tEnd; i++) if (/^\s*\/\/\s*STEP/.test(lines[i])) { headerIdx = i; break; }
+    const head = headerIdx >= 0 ? [lines[headerIdx]] : [];
+    lines.splice(tStart + 1, tEnd - tStart - 1, ...head, ...rows);
+  }
+  inserts.sort((a, b) => b.after - a.after);
+  for (const ins of inserts) lines.splice(ins.after + 1, 0, ins.txt);
+  return lines.join("\n");
+}
+function tableRows(steps) {
+  const w = [14, 12, 10, 9, 12, 9, 8, 12, 16];
+  return steps.map((s) => {
+    const cells = [`"${s.name}",`, s.arm + ",", s.scoop + ",", s.slide + ",", s.speed + ",", s.move + ",", s.via + ",", s.vib + ",", `${s.waitType}(${s.waitVal})`];
+    let line = "  { " + cells.map((c, i) => i < cells.length - 1 ? c.padEnd(w[i] + 1) : c.padEnd(w[i])).join("") + " },";
+    if (s.note) line += "  // " + s.note;
+    return line;
+  });
+}
+
+// ============================================================================
+// MODEL
+// ============================================================================
+const M = { doc: null, consts: [], steps: [], cfgDoc: null, cfg: {}, cfgConsts: [], dirty: false, cfgDirty: false };
+const CFG_DEFAULT = { CAL_ARM_DEG: 110.6, CAL_SCOOP_DEG: -69.4, ARM_R_CAL_US: 855.2, ARM_L_CAL_US: 2144.8, SCOOP_CAL_US: 1837.3,
+  ARM_US_PER_DEG: 8, SCOOP_US_PER_DEG: 6.667, ARM_R_DIR: -1, ARM_L_DIR: 1, SCOOP_DIR: 1,
+  ARM_MIN_DEG: -65, ARM_MAX_DEG: 115, SCOOP_MIN_DEG: -250, SCOOP_MAX_DEG: 10, SERVO_NATIVE_DEG_S: 430,
+  SLIDE_STEP_UP: 1.8, SLIDE_SPOOL_DIA_MM: 36.15, SLIDE_COUNTS_PER_MOTOR_REV: 384.5, SLIDE_STRINGING: 1, SLIDE_MOTOR_FREE_RPM: 435 };
+const cfgv = (k) => (M.cfg[k] !== undefined ? M.cfg[k] : CFG_DEFAULT[k]);
+const constMap = () => { const m = {}; for (const c of M.consts) m[c.name] = c.value; return m; };
+function groupKind(g) {
+  g = (g || "").toUpperCase();
+  if (g.includes("ARM ANGLE")) return "arm";
+  if (g.includes("SCOOP ANGLE")) return "scoop";
+  if (g.includes("SLIDE POS")) return "slide";
+  if (g.includes("SPEED")) return "speed";
+  return "other";
+}
+function resolve(tok, kind) {
+  tok = String(tok).trim();
+  if (tok === "HOLD" || tok === "NONE") return null;
+  if (kind === "move") { if (tok === "INSTANT") return -1; if (tok === "PROFILED") return 0; }
+  const n = Number(tok.replace(/f$/, ""));
+  if (tok !== "" && !isNaN(n)) return n;
+  const c = M.consts.find((x) => x.name === tok);
+  return c ? c.value : undefined;
+}
+function loadSequence(text, label) {
+  const doc = parseHeader(text);
+  if (!doc.steps.length) throw new Error("No SEQUENCE table found in that file.");
+  M.doc = doc; M.consts = doc.consts.map((c) => ({ ...c })); M.steps = doc.steps.map((s) => ({ ...s }));
+  M.dirty = false; setFileChip(label);
+}
+function loadConfig(text) {
+  const doc = parseHeader(text);
+  M.cfgDoc = doc; M.cfgConsts = doc.consts.map((c) => ({ ...c }));
+  M.cfg = {}; for (const c of M.cfgConsts) M.cfg[c.name] = c.value;
+  // derived values RobotConfig computes with expressions
+  M.cfgDirty = false;
+}
+function sequenceText() { return writeHeader(M.doc, M.consts, M.steps); }
+function configText() { return M.cfgDoc ? writeHeader(M.cfgDoc, M.cfgConsts, []) : ""; }
+function markDirty() { M.dirty = true; setFileChip(); scheduleSim(); }
+
+// servo calibration helpers
+function armUs(deg) { return { r: cfgv("ARM_R_CAL_US") + cfgv("ARM_R_DIR") * cfgv("ARM_US_PER_DEG") * (deg - cfgv("CAL_ARM_DEG")),
+                              l: cfgv("ARM_L_CAL_US") + cfgv("ARM_L_DIR") * cfgv("ARM_US_PER_DEG") * (deg - cfgv("CAL_ARM_DEG")) }; }
+function scoopUs(deg) { return cfgv("SCOOP_CAL_US") + cfgv("SCOOP_DIR") * cfgv("SCOOP_US_PER_DEG") * (deg - cfgv("CAL_SCOOP_DEG")); }
+function slideFreeSpeed() { return cfgv("SLIDE_MOTOR_FREE_RPM") / 60 * cfgv("SLIDE_STEP_UP") * Math.PI * cfgv("SLIDE_SPOOL_DIA_MM") * cfgv("SLIDE_STRINGING"); }
+
+// ============================================================================
+// SIMULATOR  (same rules as the firmware's step runner)
+// ============================================================================
+class Profile {
+  constructor() { this.vmax = 100; this.amax = 200; this.done = true; this.x0 = 0; this.x1 = 0; this.T = 0; }
+  setLimits(v, a) { this.vmax = Math.max(Math.abs(v), 0.001); this.amax = Math.max(Math.abs(a), 0.001); }
+  move(x0, x1, t0, vs = 0, ve = 0) {
+    Object.assign(this, { x0, x1, t0 }); const d = Math.abs(x1 - x0); this.dir = x1 >= x0 ? 1 : -1; this.d = d;
+    let v0 = Math.abs(vs), v1 = Math.min(Math.abs(ve), this.vmax); const a = this.amax;
+    if (d < 0.001) { this.T = 0; this.done = true; this.v0 = this.v1 = this.vp = 0; return; }
+    let vp = Math.max(this.vmax, v0), da = Math.abs(vp * vp - v0 * v0) / (2 * a), dd = (vp * vp - v1 * v1) / (2 * a), dec = a;
+    if (da + dd > d) {
+      const vt = Math.sqrt(a * d + 0.5 * (v0 * v0 + v1 * v1));
+      if (vt >= v0 && vt >= v1) vp = vt;
+      else if (v1 > v0) { vp = Math.sqrt(v0 * v0 + 2 * a * d); v1 = vp; }
+      else { vp = v0; dec = Math.max((v0 * v0 - v1 * v1) / (2 * d), 0.001); }
+      da = Math.abs(vp * vp - v0 * v0) / (2 * a); dd = (vp * vp - v1 * v1) / (2 * dec);
+      if (da + dd > d) { const s = d / (da + dd); da *= s; dd *= s; }
+    }
+    Object.assign(this, { v0, v1, vp, dec, a1: vp >= v0 ? a : -a, d1: da, d2: Math.max(0, d - da - dd) });
+    this.t1 = Math.abs(vp - v0) / a; this.t2 = vp > 1e-4 ? this.d2 / vp : 0; this.t3 = Math.max(0, (vp - v1) / dec);
+    this.T = this.t1 + this.t2 + this.t3; this.done = false;
+  }
+  at(t) {   // -> position, sets this.p (0..1) and this.vel
+    if (this.done) { this.p = 1; this.vel = 0; return this.x1; }
+    let e = t - this.t0, dist;
+    if (e >= this.T) { this.done = true; this.p = 1; this.vel = 0; return this.x1; }
+    if (e <= 0) { dist = 0; this.vel = this.v0; }
+    else if (e < this.t1) { dist = this.v0 * e + 0.5 * this.a1 * e * e; this.vel = this.v0 + this.a1 * e; }
+    else if ((e -= this.t1) < this.t2) { dist = this.d1 + this.vp * e; this.vel = this.vp; }
+    else { e -= this.t2; dist = this.d1 + this.d2 + this.vp * e - 0.5 * this.dec * e * e; this.vel = this.vp - this.dec * e; }
+    dist = Math.min(Math.max(dist, 0), this.d); this.p = this.d > 0 ? dist / this.d : 1;
+    return this.x0 + this.dir * dist;
+  }
+}
+class Axis {
+  constructor(min, max, native) { this.min = min; this.max = max; this.native = native; this.cmd = 0; this.target = 0; this.mode = "idle"; this.prof = new Profile(); this.vib = 0; this.vibHalf = 50; }
+  clamp(v) { return Math.min(this.max, Math.max(this.min, v)); }
+  begin(v) { this.cmd = this.target = this.clamp(v); this.mode = "idle"; }
+  moveTo(v, t, vel, acc) { this.target = this.clamp(v); this.prof.setLimits(vel, acc); this.prof.move(this.cmd, this.target, t); this.mode = "profile"; }
+  instantTo(v, t) { this.target = this.clamp(v); this.from = this.cmd; this.t0 = t; this.dur = Math.abs(this.target - this.from) / this.native; this.mode = "instant"; }
+  jumpTo(v) { this.cmd = this.target = this.clamp(v); this.mode = "idle"; }
+  update(t) {
+    if (this.mode === "profile") { this.cmd = this.prof.at(t); if (this.prof.done) this.mode = "idle"; }
+    else if (this.mode === "instant") {
+      const e = t - this.t0; if (e >= this.dur || this.dur <= 0) { this.cmd = this.target; this.mode = "idle"; }
+      else this.cmd = this.from + (this.target - this.from) * (e / this.dur);
+    }
+  }
+  progress(t) {
+    if (this.mode === "profile") { this.prof.at(t); return this.prof.p; }
+    if (this.mode === "instant") return this.dur > 0 ? Math.min(1, (t - this.t0) / this.dur) : 1;
+    return 1;
+  }
+  out(t) { if (!this.vib) return this.cmd; const k = Math.floor((t - this.vibT0) * 1000 / this.vibHalf); return this.clamp(this.cmd + (k % 2 === 0 ? -this.vib : this.vib)); }
+}
+
+let SIM = null;
+function simulate() {
+  const C = constMap(), V = (k, d) => (C[k] !== undefined ? C[k] : d);
+  const errs = [];
+  const rows = M.steps.map((s, i) => {
+    const r = {};
+    for (const [f, kind] of [["arm", "arm"], ["scoop", "scoop"], ["slide", "slide"], ["speed", "speed"], ["move", "move"], ["via", "arm"], ["vib", "vib"]]) {
+      const v = resolve(s[f], kind);
+      if (v === undefined) errs.push(`Step ${i} ${s.name}: "${s[f]}" is not a number or a known name.`);
+      r[f] = v === undefined ? null : v;
+    }
+    const wv = resolve(s.waitVal, "num");
+    if (wv === undefined || wv === null) errs.push(`Step ${i} ${s.name}: wait value "${s.waitVal}" must be a number.`);
+    r.waitType = s.waitType; r.waitVal = wv || 0; r.name = s.name;
+    if (r.move === null) r.move = 0;
+    return r;
+  });
+  const ARM_SPEED = V("ARM_SPEED", 300), ARM_ACCEL = V("ARM_ACCEL", 1600), SC_SPEED = V("SCOOP_SPEED", 450), SC_ACCEL = V("SCOOP_ACCEL", 2250);
+  const SLIDE_MAX = V("SLIDE_MAX", 1100), SLIDE_ACCEL = V("SLIDE_ACCEL", 3000), EASE = V("TIMED_MOVE_EASE", 0), VHALF = V("VIBRATE_HALF_PERIOD_MS", 50);
+  const native = cfgv("SERVO_NATIVE_DEG_S");
+  const arm = new Axis(cfgv("ARM_MIN_DEG"), cfgv("ARM_MAX_DEG"), native / (48 / 40));
+  const scoop = new Axis(cfgv("SCOOP_MIN_DEG"), cfgv("SCOOP_MAX_DEG"), native);
+  arm.begin(V("A_START", -58)); scoop.begin(V("S_START", 0));
+  const slide = new Profile(); let slidePos = 0, slideTarget = 0, slideVEnd = 0;
+  let tmA = null, tmS = null;      // timed moves, one per axis (like the firmware)
+  const frames = [], spans = [];
+  const dt = 0.005; let t = 0, i = 0, stepT0 = 0, arrivedAt = -1, armMoved = false, scMoved = false, slMoved = false, done = false;
+  const ease = (u) => { if (u <= 0) return 0; if (u >= 1) return 1; let e = EASE; if (e <= 0.001) return u; e = Math.min(e, 0.5); const vp = 1 / (1 - e);
+    if (u < e) return 0.5 * vp * u * u / e; if (u < 1 - e) return 0.5 * vp * e + vp * (u - e); const r = 1 - u; return 1 - 0.5 * vp * r * r / e; };
+  const speedFor = (r) => Math.min(r.speed > 0 ? r.speed : SLIDE_MAX, SLIDE_MAX);
+  function enter(k) {
+    i = k; const r = rows[k]; stepT0 = t; arrivedAt = -1;
+    armMoved = r.arm !== null; scMoved = r.scoop !== null; slMoved = false;
+    if (armMoved) tmA = null;
+    if (scMoved) tmS = null;
+    if (r.move > 0) {
+      if (armMoved) tmA = { t0: t, dur: r.move / 1000, from: arm.cmd, to: r.arm, via: r.via, p: 0 };
+      if (scMoved) tmS = { t0: t, dur: r.move / 1000, from: scoop.cmd, to: r.scoop, via: null, p: 0 };
+    } else if (r.move === -1) { if (armMoved) arm.instantTo(r.arm, t); if (scMoved) scoop.instantTo(r.scoop, t); }
+    else { if (armMoved) arm.moveTo(r.arm, t, ARM_SPEED, ARM_ACCEL); if (scMoved) scoop.moveTo(r.scoop, t, SC_SPEED, SC_ACCEL); }
+    if (r.vib > 0) { scoop.vib = r.vib; scoop.vibT0 = t; scoop.vibHalf = VHALF; } else scoop.vib = 0;
+    if (r.slide !== null) {
+      const sp = speedFor(r), vStart = slideVEnd; let vEnd = 0;
+      if (r.waitType === "WAIT_ARRIVED" && k < rows.length - 1 && rows[k + 1].slide !== null) {
+        const d1 = r.slide - slidePos, d2 = rows[k + 1].slide - r.slide;
+        if (d1 * d2 > 0) vEnd = Math.min(speedFor(rows[k + 1]), sp);
+      }
+      slide.setLimits(sp, SLIDE_ACCEL); slide.move(slidePos, r.slide, t, vStart, vEnd);
+      slideTarget = r.slide; slideVEnd = vEnd; slMoved = true;
+    } else slideVEnd = 0;
+    spans.push({ i: k, t0: t, t1: null, name: r.name });
+  }
+  function met() {
+    const r = rows[i], el = t - stepT0;
+    switch (r.waitType) {
+      case "WAIT_MS": return el * 1000 >= r.waitVal - 1e-6;
+      case "WAIT_ARRIVED": {
+        const all = (!armMoved || (!tmA && arm.mode === "idle")) && (!scMoved || (!tmS && scoop.mode === "idle")) && (!slMoved || slide.done);
+        if (!all) { arrivedAt = -1; return false; }
+        if (arrivedAt < 0) arrivedAt = t;
+        return (t - arrivedAt) * 1000 >= r.waitVal - 1e-6;
+      }
+      case "WAIT_ARM": { const p = tmA ? tmA.p : arm.progress(t); return p * 100 >= r.waitVal - 1e-6; }
+      case "WAIT_SLIDE": if (!slMoved) return true; slide.at(t); return slide.p * 100 >= r.waitVal - 1e-6;
+    }
+    return true;
+  }
+  if (!rows.length) return { frames, spans, total: 0, errs };
+  enter(0);
+  let nextFrame = 0;
+  while (!done && t < 60) {
+    const stepTm = (m, ax) => {
+      if (!m) return m;
+      const u = Math.min(1, (t - m.t0) / m.dur), p = ease(u); m.p = p;
+      ax.jumpTo(m.via !== null ? (p < 0.5 ? m.from + (m.via - m.from) * (p / 0.5) : m.via + (m.to - m.via) * ((p - 0.5) / 0.5)) : m.from + (m.to - m.from) * p);
+      return u >= 1 ? null : m;
+    };
+    tmA = stepTm(tmA, arm); tmS = stepTm(tmS, scoop);
+    arm.update(t); scoop.update(t);
+    slidePos = slide.done ? slideTarget : slide.at(t);
+    if (t >= nextFrame - 1e-9) {
+      frames.push({ t, i, aT: arm.target, aC: arm.cmd, sT: scoop.target, sC: scoop.cmd, sO: scoop.out(t), x: slidePos, xT: slideTarget, vib: scoop.vib > 0, timed: !!(tmA || tmS) });
+      nextFrame += 0.01;
+    }
+    if (met()) {
+      spans[spans.length - 1].t1 = t;
+      if (i >= rows.length - 1) { done = true; break; }
+      enter(i + 1);
+      continue;   // same instant: the firmware enters the next step in the same loop pass
+    }
+    t += dt;
+  }
+  if (!done && spans.length) spans[spans.length - 1].t1 = t;
+  frames.push({ ...frames[frames.length - 1], t });
+  return { frames, spans, total: t, errs, rows };
+}
+let simTimer = 0;
+function scheduleSim() { clearTimeout(simTimer); simTimer = setTimeout(runSim, 60); }
+// Rocks are aboard once the scoop holds with the arm out at the floor. Pouring before the arm is
+// back over the bucket would drop them. (Heuristic on the twin's angles: trust it after calibration.)
+const SPILL_FLOOR_DEG = 60, SPILL_BUCKET_DEG = -25;
+function spillCheck(sim) {
+  const byStep = {}, at = []; let loaded = false, pourT = -1;
+  for (const f of sim.frames) {
+    const st = holdState(f.aC, f.sC);
+    if (!loaded) { if (st === "hold" && f.aC > SPILL_FLOOR_DEG) loaded = true; pourT = -1; continue; }
+    if (st !== "pour") { pourT = -1; continue; }
+    if (f.aC <= SPILL_BUCKET_DEG) { loaded = false; continue; }          // poured into the bucket: good
+    if (pourT < 0) pourT = f.t;
+    if (f.t - pourT >= 0.05) {
+      if (!(f.i in byStep)) byStep[f.i] = `Scoop pours with the arm at ${f.aC.toFixed(0)}°, not over the bucket: rocks would fall out.`;
+      at.push(pourT); loaded = false;
+    }
+  }
+  return { byStep, at };
+}
+function runSim() {
+  SIM = simulate();
+  SIM.spill = spillCheck(SIM);
+  const e = $("errors");
+  e.hidden = !SIM.errs.length; e.textContent = SIM.errs.join("  ");
+  $("totalTime").textContent = SIM.total.toFixed(2) + " s";
+  if (S.t > SIM.total) S.t = SIM.total;
+  updateStepTimes(); drawTimeline(); drawAt(S.t); refreshStory();
+}
+
+// ============================================================================
+// SCOOP HOLD STATE  (CAD: scoop inner face is -Z at 0 deg; world angle = -arm + scoop)
+// ============================================================================
+function holdState(armDeg, scoopDeg) {
+  const th = (-armDeg + scoopDeg) * DEG;
+  const nz = -Math.cos(th);          // inner-face normal, z component
+  return nz > 0.3 ? "hold" : nz < -0.3 ? "pour" : "level";
+}
+
+// ============================================================================
+// UI: step table
+// ============================================================================
+const S = { t: 0, sel: -1, playing: false, rate: 1, live: null, preview: null };
+const WAITS = ["WAIT_MS", "WAIT_ARRIVED", "WAIT_ARM", "WAIT_SLIDE"];
+const WAIT_LABEL = { WAIT_MS: "after ms", WAIT_ARRIVED: "arrived + ms", WAIT_ARM: "arm at %", WAIT_SLIDE: "slides at %" };
+const COLS = [["arm", "Arm", "dl-arm"], ["scoop", "Scoop", "dl-scoop"], ["slide", "Slide mm", "dl-slide"], ["speed", "Slide mm/s", "dl-speed"],
+              ["move", "Move", "dl-move"], ["via", "Arm via", "dl-via"], ["vib", "Vibrate ±°", "dl-vib"]];
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+function isIdle(f, v) { v = String(v).trim(); return v === "HOLD" || v === "NONE" || (["vib", "speed"].includes(f) && (v === "0" || v === "")); }
+function renderTable() {
+  const tb = $("stepTable");
+  let h = `<thead><tr><th>#</th><th>Step</th><th>What happens</th>${COLS.map((c) => `<th>${c[1]}</th>`).join("")}<th>Next when</th><th style="text-align:right">Start</th><th style="text-align:right">Takes</th><th>Note</th><th></th></tr></thead><tbody>`;
+  M.steps.forEach((s, i) => {
+    h += `<tr data-i="${i}" class="${i === S.sel ? "sel" : ""}"><td class="idx" data-jump="${i}" title="Edit this step"><span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>${i}</td>`;
+    h += `<td><input id="c${i}_name" data-f="name" value="${esc(s.name)}" maxlength="12" style="min-width:110px;font-weight:500" aria-label="Step ${i} name"></td>`;
+    h += `<td class="what" data-jump="${i}" id="what${i}" title="Edit this step">${describe(i)}</td>`;
+    for (const [f, lab, dl] of COLS) h += `<td><input id="c${i}_${f}" data-f="${f}" list="${dl}" value="${esc(s[f])}" class="${isIdle(f, s[f]) ? "idle" : ""}" style="min-width:${f === "move" ? 86 : 104}px" aria-label="Step ${i} ${lab}"></td>`;
+    h += `<td><div class="waitcell"><select id="c${i}_waitType" data-f="waitType" aria-label="Step ${i} next when">${WAITS.map((w) => `<option value="${w}"${w === s.waitType ? " selected" : ""}>${WAIT_LABEL[w]}</option>`).join("")}</select>` +
+         `<input id="c${i}_waitVal" data-f="waitVal" class="num" value="${esc(s.waitVal)}" aria-label="Step ${i} wait value"></div></td>`;
+    h += `<td class="time" id="st${i}">–</td><td class="time" id="du${i}">–</td>`;
+    h += `<td class="note"><input id="c${i}_note" data-f="note" value="${esc(s.note)}" style="min-width:160px" aria-label="Step ${i} note"></td>`;
+    h += `<td class="acts"><button data-act="up" title="Move up" aria-label="Move step ${i} up">↑</button><button data-act="down" title="Move down" aria-label="Move step ${i} down">↓</button><button data-act="dup" title="Duplicate" aria-label="Duplicate step ${i}">⧉</button><button data-act="del" title="Delete" aria-label="Delete step ${i}">✕</button></td></tr>`;
+  });
+  tb.innerHTML = h + "</tbody>";
+  validateCells();
+  updateStepTimes();
+}
+function validateCells() {
+  M.steps.forEach((s, i) => {
+    for (const [f] of COLS) { const el = $(`c${i}_${f}`); if (el) { el.classList.toggle("bad", resolve(s[f], f === "move" ? "move" : "x") === undefined); el.classList.toggle("idle", isIdle(f, s[f])); } }
+    const w = $(`c${i}_waitVal`); if (w) w.classList.toggle("bad", !(resolve(s.waitVal, "num") >= 0));
+  });
+}
+// a step that is over the instant it starts, although it waits for something, is almost always a mistake
+function stepWarning(i) {
+  if (!SIM) return "";
+  if (SIM.spill && SIM.spill.byStep[i]) return SIM.spill.byStep[i];
+  const sp = SIM.spans.find((x) => x.i === i), s = M.steps[i];
+  if (!sp || sp.t1 === null) return "";
+  const ms = (sp.t1 - sp.t0) * 1000;
+  if (ms < 1 && s.waitType === "WAIT_ARM") return "Ends straight away: the arm isn't moving (or is already that far) when this step starts.";
+  if (ms < 1 && s.waitType === "WAIT_SLIDE") return "Ends straight away: the slides aren't moving in this step.";
+  if (ms < 1 && s.waitType === "WAIT_ARRIVED" && +s.waitVal === 0) return "Ends straight away: nothing this step moves needs time (all HOLD, or already there).";
+  return "";
+}
+function updateStepTimes() {
+  if (!SIM) return;
+  M.steps.forEach((s, i) => {
+    const sp = SIM.spans.find((x) => x.i === i);
+    const a = $("st" + i), b = $("du" + i);
+    if (a) a.textContent = sp ? sp.t0.toFixed(2) + " s" : "–";
+    if (b) { const w = stepWarning(i); b.innerHTML = (sp && sp.t1 !== null ? Math.round((sp.t1 - sp.t0) * 1000) + " ms" : "–") + (w ? ` <span class="warn" title="${esc(w)}">⚠</span>` : ""); }
+  });
+}
+function refreshRow(i) { const w = $("what" + i); if (w) w.innerHTML = describe(i); }
+$("stepTable").addEventListener("input", (e) => {
+  const el = e.target, tr = el.closest("tr"); if (!tr || !el.dataset.f) return;
+  const i = +tr.dataset.i; M.steps[i][el.dataset.f] = el.value.trim();
+  if (el.dataset.f === "name") M.steps[i].name = el.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 12);
+  validateCells(); refreshRow(i); markDirty();
+  if (i === S.sel) renderInspector();
+});
+$("stepTable").addEventListener("change", (e) => { if (e.target.dataset.f === "waitType") { const i = +e.target.closest("tr").dataset.i; M.steps[i].waitType = e.target.value; refreshRow(i); markDirty(); if (i === S.sel) renderInspector(); } });
+$("stepTable").addEventListener("click", (e) => {
+  if (e.target.closest(".grip")) return;
+  const jt = e.target.closest("[data-jump]");
+  if (jt) { selectStep(+jt.dataset.jump, true); openTab("pane-step"); return; }
+  const act = e.target.dataset.act; if (!act) return;
+  const i = +e.target.closest("tr").dataset.i, st = M.steps;
+  if (act === "up" && i > 0) { [st[i - 1], st[i]] = [st[i], st[i - 1]]; if (S.sel === i) S.sel--; }
+  if (act === "down" && i < st.length - 1) { [st[i + 1], st[i]] = [st[i], st[i + 1]]; if (S.sel === i) S.sel++; }
+  if (act === "dup") st.splice(i + 1, 0, { ...st[i], name: uniqueName(st[i].name) });
+  if (act === "del") { if (st.length <= 1) return; st.splice(i, 1); if (S.sel >= st.length) S.sel = st.length - 1; }
+  renderTable(); renderInspector(); markDirty();
+});
+// drag ⠿ to reorder steps
+let rowDrag = null;
+$("stepTable").addEventListener("pointerdown", (e) => {
+  const g = e.target.closest(".grip"); if (!g || e.button !== 0) return;
+  e.preventDefault();
+  const tr = g.closest("tr"); rowDrag = { from: +tr.dataset.i, to: +tr.dataset.i };
+  g.setPointerCapture(e.pointerId); tr.classList.add("dragging"); document.body.classList.add("rowdrag");
+});
+$("stepTable").addEventListener("pointermove", (e) => {
+  if (!rowDrag) return;
+  const rows = [...document.querySelectorAll("#stepTable tbody tr")];
+  let ins = rows.length;
+  for (let k = 0; k < rows.length; k++) { const r = rows[k].getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { ins = k; break; } }
+  rowDrag.to = ins;
+  const moves = ins !== rowDrag.from && ins !== rowDrag.from + 1;
+  rows.forEach((r, k) => { r.classList.toggle("drop-before", moves && k === ins); r.classList.toggle("drop-after", moves && ins === rows.length && k === rows.length - 1); });
+  if (e.clientY < 50) window.scrollBy(0, -14); else if (e.clientY > innerHeight - 50) window.scrollBy(0, 14);
+});
+function endRowDrag() {
+  if (!rowDrag) return;
+  const { from, to } = rowDrag; rowDrag = null; document.body.classList.remove("rowdrag");
+  if (to === from || to === from + 1) { renderTable(); return; }
+  const [s] = M.steps.splice(from, 1), k = to > from ? to - 1 : to;
+  M.steps.splice(k, 0, s);
+  let sel = S.sel; if (sel === from) sel = k; else { if (sel > from) sel--; if (sel >= k) sel++; } S.sel = sel;
+  renderTable(); renderInspector(); markDirty(); toast(`Moved ${s.name} to step ${k}`);
+}
+$("stepTable").addEventListener("pointerup", endRowDrag);
+$("stepTable").addEventListener("pointercancel", endRowDrag);
+function uniqueName(base) {
+  base = base.replace(/_\d+$/, "").slice(0, 9); let k = 2;
+  while (M.steps.some((s) => s.name === `${base}_${k}`)) k++;
+  return `${base}_${k}`;
+}
+const PRESETS_STEP = {
+  arm:    { name: "ARM_MOVE",   arm: "A_DOWN", move: "PROFILED", waitType: "WAIT_ARRIVED", waitVal: "0" },
+  scoop:  { name: "SCOOP_MOVE", scoop: "S_PICKUP", move: "PROFILED", waitType: "WAIT_ARRIVED", waitVal: "0" },
+  both:   { name: "ARM_SCOOP",  arm: "A_DOWN", scoop: "S_SCOOP", move: "1000", waitType: "WAIT_ARRIVED", waitVal: "0" },
+  slides: { name: "SLIDES",     slide: "X_CREEP", speed: "SLIDE_FAST", waitType: "WAIT_ARRIVED", waitVal: "0" },
+  vib:    { name: "SHAKE",      vib: "VIBRATE_DEG", waitType: "WAIT_MS", waitVal: "1000" },
+  wait:   { name: "WAIT",       waitType: "WAIT_MS", waitVal: "500" },
+  blank:  { name: "NEW_STEP",   waitType: "WAIT_MS", waitVal: "0" },
+};
+$("addStepSel").onchange = (e) => {
+  const p = PRESETS_STEP[e.target.value]; e.target.value = ""; if (!p) return;
+  const st = { name: "", arm: HOLD, scoop: HOLD, slide: HOLD, speed: "0", move: "PROFILED", via: "NONE", vib: "0", waitType: "WAIT_MS", waitVal: "500", note: "", ...p };
+  st.name = M.steps.some((s) => s.name === st.name) ? uniqueName(st.name) : st.name;
+  const at = S.sel >= 0 ? S.sel + 1 : M.steps.length;
+  M.steps.splice(at, 0, st);
+  S.sel = at; renderTable(); markDirty(); openTab("pane-step"); renderInspector();
+  toast(`Added ${st.name} as step ${at}`);
+};
+function selectStep(i, jump) {
+  S.sel = i;
+  document.querySelectorAll("#stepTable tbody tr").forEach((tr) => tr.classList.toggle("sel", +tr.dataset.i === i));
+  if (jump && SIM) { const sp = SIM.spans.find((x) => x.i === i); if (sp) { S.t = sp.t0 + 0.001; S.preview = null; drawAt(S.t); } }
+  renderInspector();
+}
+
+// ============================================================================
+// PLAIN-ENGLISH STEP DESCRIPTIONS
+// ============================================================================
+function tokText(tok, unit) {
+  tok = String(tok).trim();
+  const c = M.consts.find((x) => x.name === tok);
+  if (c) return `<b>${esc(tok)}</b> <span class="num">(${+c.value.toFixed(1)}${unit})</span>`;
+  return `<b class="num">${esc(tok)}${unit}</b>`;
+}
+function describe(i) {
+  const s = M.steps[i]; if (!s) return "";
+  const parts = [], moving = (v) => v !== "HOLD" && v !== "";
+  const mv = resolve(s.move, "move");
+  const how = mv === -1 ? "jumps to" : mv === 0 || mv === null || mv === undefined ? "moves smoothly to" : `moves over ${mv} ms to`;
+  const viaOk = moving(s.via) && s.via !== "NONE";
+  if (moving(s.arm) && moving(s.scoop) && mv > 0) {
+    parts.push(`Arm and scoop move together over ${mv} ms: arm to ${tokText(s.arm, "°")}${viaOk ? ` via ${tokText(s.via, "°")}` : ""}, scoop to ${tokText(s.scoop, "°")}.`);
+  } else {
+    if (moving(s.arm)) parts.push(`Arm ${how} ${tokText(s.arm, "°")}${viaOk && mv > 0 ? ` via ${tokText(s.via, "°")}` : ""}.`);
+    if (moving(s.scoop)) parts.push(`Scoop ${how} ${tokText(s.scoop, "°")}.`);
+  }
+  if (moving(s.slide)) {
+    const sp = resolve(s.speed, "x");
+    const nx = M.steps[i + 1];
+    const blend = s.waitType === "WAIT_ARRIVED" && nx && moving(nx.slide);
+    parts.push(`Slides go to ${tokText(s.slide, " mm")} at ${sp > 0 ? tokText(s.speed, " mm/s") : "max speed"}${blend ? ", then blend into the next step without stopping" : ""}.`);
+  }
+  const vib = resolve(s.vib, "x");
+  if (vib > 0) parts.push(`Scoop shakes ±${+vib.toFixed(1)}° at 10 Hz.`);
+  if (!parts.length) parts.push(`Nothing new moves; moves from earlier steps keep going.`);
+  const wv = esc(s.waitVal);
+  const next = { WAIT_MS: `Next step after <b>${wv} ms</b>.`,
+                 WAIT_ARRIVED: +s.waitVal ? `Next step when those moves finish, then <b>${wv} ms</b>.` : `Next step when those moves finish.`,
+                 WAIT_ARM: `Next step when the arm is <b>${wv}%</b> of the way there.`,
+                 WAIT_SLIDE: `Next step when the slides are <b>${wv}%</b> of the way there.` }[s.waitType] || "";
+  return parts.join(" ") + " " + next;
+}
+
+// ============================================================================
+// STEP INSPECTOR  (friendlier editor for the selected row)
+// ============================================================================
+function namesOf(kind) { return M.consts.filter((c) => groupKind(c.group) === kind).map((c) => c.name); }
+function pickCtl(id, label, tok, names, unit, holdLabel, extra = []) {
+  tok = String(tok).trim();
+  const known = tok === "HOLD" || names.includes(tok) || extra.some((x) => x[0] === tok);
+  const opts = [`<option value="HOLD"${tok === "HOLD" ? " selected" : ""}>${holdLabel}</option>`]
+    .concat(extra.map(([v, l]) => `<option value="${v}"${tok === v ? " selected" : ""}>${l}</option>`))
+    .concat(names.map((n) => { const c = M.consts.find((x) => x.name === n); return `<option value="${n}"${tok === n ? " selected" : ""}>${n}  (${+c.value.toFixed(1)}${unit})</option>`; }))
+    .concat([`<option value="__num"${known ? "" : " selected"}>a number…</option>`]);
+  return `<div class="ictl"><label for="${id}">${label}</label><div class="pair"><select id="${id}">${opts.join("")}</select>` +
+         `<input id="${id}_n" class="num" type="number" step="0.5" value="${known ? "" : esc(tok)}"${known ? " hidden" : ""} aria-label="${label.replace(/<[^>]+>/g, "").trim()} value"></div></div>`;
+}
+function storyHtml(i) {
+  const sp = SIM && SIM.spans.find((x) => x.i === i), w = stepWarning(i);
+  const t = sp ? `starts ${sp.t0.toFixed(2)} s · takes ${sp.t1 !== null ? Math.round((sp.t1 - sp.t0) * 1000) + " ms" : "–"}` : "not reached";
+  return `${describe(i)}<span class="t">${t}</span>${w ? `<span class="t warn">⚠ ${esc(w)}</span>` : ""}`;
+}
+function refreshStory() { const el = document.querySelector("#pane-step .story"); if (el && M.steps[S.sel]) el.innerHTML = storyHtml(S.sel); }
+function renderInspector() {
+  const host = $("pane-step"); if (!host) return;
+  const i = S.sel, s = M.steps[i];
+  if (!s) { host.innerHTML = `<p class="hint">Click a step's number or description in the table (or a block on the timeline) to edit it here, in plain words.</p>`; return; }
+  const mv = resolve(s.move, "move");
+  const moveMode = mv === -1 ? "INSTANT" : mv > 0 ? "TIMED" : "PROFILED";
+  const speedNames = M.consts.filter((c) => c.name.startsWith("SLIDE_")).map((c) => c.name);
+  const vibNames = M.consts.filter((c) => c.name.startsWith("VIBRATE") && !c.name.includes("PERIOD")).map((c) => c.name);
+  const vibOn = (resolve(s.vib, "x") || 0) > 0;
+  const radio = (v, label, inner = "") => `<label><input type="radio" name="iWait" value="${v}"${s.waitType === v ? " checked" : ""}> ${label}${inner}</label>`;
+  const wv = `<input id="iWaitV_%" class="num" type="number" step="1" min="0" value="${esc(s.waitVal)}">`;
+  host.innerHTML = `<div class="insp">
+    <div class="insp-head"><button id="iPrev" aria-label="Previous step"${i <= 0 ? " disabled" : ""}>‹</button><span class="mono">#${i}</span>
+      <input id="iName" value="${esc(s.name)}" maxlength="12" aria-label="Step name"><button id="iNext" aria-label="Next step"${i >= M.steps.length - 1 ? " disabled" : ""}>›</button></div>
+    <div class="story">${storyHtml(i)}</div>
+    ${pickCtl("iArm", '<span class="dot" style="background:var(--arm)"></span> Arm', s.arm, namesOf("arm"), "°", "carry on (HOLD)")}
+    ${pickCtl("iScoop", '<span class="dot" style="background:var(--scoop)"></span> Scoop', s.scoop, namesOf("scoop"), "°", "carry on (HOLD)")}
+    <div class="ictl"><span class="lab">Moves</span><div class="choices">
+      <label><input type="radio" name="iMove" value="INSTANT"${moveMode === "INSTANT" ? " checked" : ""}> Jump: send the angle, servo goes at its own speed (V2)</label>
+      <label><input type="radio" name="iMove" value="PROFILED"${moveMode === "PROFILED" ? " checked" : ""}> Smooth: speed up and slow down (ARM_SPEED / SCOOP_SPEED)</label>
+      <label><input type="radio" name="iMove" value="TIMED"${moveMode === "TIMED" ? " checked" : ""}> Take exactly <input id="iMoveMs" class="num" type="number" step="50" min="1" value="${mv > 0 ? mv : 1000}"> ms (arm and scoop finish together)</label>
+    </div></div>
+    ${moveMode === "TIMED" ? pickCtl("iVia", "Arm via", s.via === "NONE" ? "HOLD" : s.via, namesOf("arm"), "°", "straight there (no via)") : ""}
+    ${pickCtl("iSlide", '<span class="dot" style="background:var(--slide)"></span> Slides', s.slide, namesOf("slide"), " mm", "carry on (HOLD)", [["0", "fully in (0 mm)"]])}
+    ${s.slide !== "HOLD" ? pickCtl("iSpeed", "Speed", s.speed === "0" ? "HOLD" : s.speed, speedNames, " mm/s", "max (SLIDE_MAX)") : ""}
+    <div class="ictl"><span class="lab">Shake</span><div class="pair"><label class="choices" style="flex-direction:row"><input id="iVibOn" type="checkbox"${vibOn ? " checked" : ""}> vibrate the scoop</label>
+      ${vibOn ? `<select id="iVib" aria-label="Vibration amount">${vibNames.map((n) => `<option value="${n}"${s.vib === n ? " selected" : ""}>${n}</option>`).join("")}<option value="__num"${vibNames.includes(s.vib) ? "" : " selected"}>±° …</option></select>${vibNames.includes(s.vib) ? "" : `<input id="iVibN" class="num" type="number" step="0.5" value="${esc(s.vib)}" aria-label="Vibration degrees">`}` : ""}</div></div>
+    <div class="ictl"><span class="lab">Next step</span><div class="choices">
+      ${radio("WAIT_MS", "after", " " + wv.replace("%", "MS") + " ms")}
+      ${radio("WAIT_ARRIVED", "when this step's moves finish, then", " " + wv.replace("%", "ARRIVED") + " ms")}
+      ${radio("WAIT_ARM", "when the arm is", " " + wv.replace("%", "ARM") + " % of the way")}
+      ${radio("WAIT_SLIDE", "when the slides are", " " + wv.replace("%", "SLIDE") + " % of the way")}
+    </div></div>
+    <div class="ictl"><label for="iNote">Note</label><input id="iNote" value="${esc(s.note)}"></div>
+    <div class="btns"><button id="iShow">Show this step</button><button id="iDup">Duplicate</button><button id="iDel">Delete</button></div>
+  </div>`;
+  const upd = (field, val) => { M.steps[i][field] = val; markDirty(); renderTable(); };
+  const wirePick = (id, field, map = (v) => v) => {
+    const sel = $(id), num = $(id + "_n"); if (!sel) return;
+    sel.onchange = () => { if (sel.value === "__num") { num.hidden = false; num.focus(); return; } num.hidden = true; upd(field, map(sel.value)); renderInspector(); };
+    if (num) num.oninput = () => { if (num.value !== "") upd(field, num.value); };
+  };
+  wirePick("iArm", "arm"); wirePick("iScoop", "scoop"); wirePick("iSlide", "slide");
+  wirePick("iVia", "via", (v) => (v === "HOLD" ? "NONE" : v)); wirePick("iSpeed", "speed", (v) => (v === "HOLD" ? "0" : v));
+  $("iName").oninput = (e) => { M.steps[i].name = e.target.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 12); markDirty(); const c = $(`c${i}_name`); if (c) c.value = M.steps[i].name; };
+  $("iNote").oninput = (e) => { M.steps[i].note = e.target.value; markDirty(); const c = $(`c${i}_note`); if (c) c.value = e.target.value; };
+  host.querySelectorAll('input[name="iMove"]').forEach((r) => r.onchange = () => { upd("move", r.value === "TIMED" ? String(+$("iMoveMs").value || 1000) : r.value); renderInspector(); });
+  $("iMoveMs").oninput = (e) => { if (host.querySelector('input[name="iMove"]:checked').value === "TIMED" && +e.target.value > 0) upd("move", String(Math.round(+e.target.value))); };
+  $("iVibOn").onchange = (e) => { upd("vib", e.target.checked ? (vibNames[0] || "5") : "0"); renderInspector(); };
+  if ($("iVib")) $("iVib").onchange = (e) => { if (e.target.value === "__num") { upd("vib", "5"); } else upd("vib", e.target.value); renderInspector(); };
+  if ($("iVibN")) $("iVibN").oninput = (e) => { if (+e.target.value > 0) upd("vib", e.target.value); };
+  host.querySelectorAll('input[name="iWait"]').forEach((r) => r.onchange = () => { upd("waitType", r.value); renderInspector(); });
+  for (const k of ["MS", "ARRIVED", "ARM", "SLIDE"]) { const el = $("iWaitV_" + k); if (el) el.oninput = () => { if (el.value !== "" && +el.value >= 0) { upd("waitVal", String(Math.round(+el.value))); } }; }
+  $("iPrev").onclick = () => selectStep(i - 1, true);
+  $("iNext").onclick = () => selectStep(i + 1, true);
+  $("iShow").onclick = () => selectStep(i, true);
+  $("iDup").onclick = () => { M.steps.splice(i + 1, 0, { ...M.steps[i], name: uniqueName(M.steps[i].name) }); S.sel = i + 1; renderTable(); markDirty(); renderInspector(); };
+  $("iDel").onclick = () => { if (M.steps.length <= 1) return; M.steps.splice(i, 1); S.sel = Math.min(i, M.steps.length - 1); renderTable(); markDirty(); renderInspector(); };
+}
+function openTab(paneId) {
+  document.querySelectorAll(".tabs button").forEach((x) => { const on = x.dataset.pane === paneId; x.setAttribute("aria-selected", on); $(x.dataset.pane).hidden = !on; });
+}
+
+// ============================================================================
+// UI: values panel
+// ============================================================================
+const UNIT = { arm: "°", scoop: "°", slide: "mm", speed: "" };
+function renderValues() {
+  const host = $("pane-values");
+  const groups = [];
+  for (const c of M.consts) { let g = groups.find((x) => x.name === c.group); if (!g) groups.push(g = { name: c.group, items: [] }); g.items.push(c); }
+  let h = `<p class="hint">Angles: arm in degrees forward of vertical, scoop in degrees from its start pose. Show poses the twin; Send moves the robot (Live link).</p>`;
+  for (const g of groups) {
+    const kind = groupKind(g.name);
+    h += `<div class="vgroup"><div class="vgroup-head"><h3>${esc(g.name)}</h3>${kind === "arm" || kind === "scoop" || kind === "slide" ? `<button data-add="${esc(g.name)}" style="padding:2px 8px;font-size:12px">Add</button>` : ""}</div>`;
+    for (const c of g.items) {
+      const id = "v_" + c.name;
+      let extra = "";
+      if (kind === "arm") { const u = armUs(c.value); extra = `R ${Math.round(u.r)} · L ${Math.round(u.l)} µs`; }
+      else if (kind === "scoop") extra = `${Math.round(scoopUs(c.value))} µs`;
+      else if (kind === "slide") extra = `${Math.round(c.value / mmPerCount())} counts`;
+      else extra = esc(c.comment || "");
+      const acts = kind === "arm" || kind === "scoop" || kind === "slide"
+        ? `<button data-show="${c.name}" title="Pose the twin here">Show</button>${kind !== "slide" ? `<button data-send="${c.name}" title="Move the robot here (Live link)"${S.live ? "" : " disabled"}>Send</button>` : ""}` : "";
+      h += `<div class="vrow"><label class="nm" for="${id}" title="${esc(c.comment)}">${c.name}</label><input id="${id}" class="num" type="number" step="${kind === "speed" ? 10 : 0.5}" value="${c.value}" data-c="${c.name}"><span class="us" title="${esc(c.comment)}">${extra}</span><span class="acts">${acts}</span></div>`;
+    }
+    h += `</div>`;
+  }
+  h += `<p class="hint">Slide free speed with the current gearing: <span class="mono">${Math.round(slideFreeSpeed())} mm/s</span>. Keep SLIDE_FAST / SLIDE_MAX under about 80% of it.</p>`;
+  host.innerHTML = h;
+  fillDatalists();
+  fillCaptureSel();
+}
+function mmPerCount() { return Math.PI * cfgv("SLIDE_SPOOL_DIA_MM") * cfgv("SLIDE_STRINGING") / (cfgv("SLIDE_COUNTS_PER_MOTOR_REV") / cfgv("SLIDE_STEP_UP")); }
+$("pane-values").addEventListener("input", (e) => {
+  const n = e.target.dataset.c; if (!n) return;
+  const c = M.consts.find((x) => x.name === n); const v = parseFloat(e.target.value);
+  if (!c || isNaN(v)) return;
+  c.value = v; markDirty();
+  const row = e.target.closest(".vrow"), kind = groupKind(c.group), us = row.querySelector(".us");
+  if (kind === "arm") { const u = armUs(v); us.textContent = `R ${Math.round(u.r)} · L ${Math.round(u.l)} µs`; }
+  if (kind === "scoop") us.textContent = `${Math.round(scoopUs(v))} µs`;
+  if (kind === "slide") us.textContent = `${Math.round(v / mmPerCount())} counts`;
+  if (kind === "arm" || kind === "scoop" || kind === "slide") previewConst(n);   // edit = show it, ghost = value in the file
+});
+$("pane-values").addEventListener("click", (e) => {
+  const show = e.target.dataset.show, send = e.target.dataset.send, add = e.target.dataset.add;
+  if (show) previewConst(show);
+  if (send) { const c = M.consts.find((x) => x.name === send); if (c) liveSendAngle(groupKind(c.group), c.value); }
+  if (add) {
+    const kind = groupKind(add), prefix = kind === "arm" ? "A_" : kind === "scoop" ? "S_" : "X_";
+    let k = 1; while (M.consts.some((c) => c.name === prefix + "NEW" + k)) k++;
+    const base = M.consts.filter((c) => c.group === add).slice(-1)[0];
+    M.consts.push({ name: prefix + "NEW" + k, type: "float", value: base ? base.value : 0, group: add, line: -1, comment: "" });
+    renderValues(); markDirty();
+  }
+});
+function savedVal(name) { const c = M.doc && M.doc.consts.find((x) => x.name === name); return c ? c.value : null; }
+function ghostFor(c, arm, scoop, value) {   // the same pose with this name at another value
+  const kind = groupKind(c.group);
+  return kind === "arm" ? { arm: value, scoop } : kind === "scoop" ? { arm, scoop: value } : null;
+}
+function previewConst(name) {
+  const c = M.consts.find((x) => x.name === name); if (!c) return;
+  const kind = groupKind(c.group), f = frameAt(S.t), was = savedVal(name), unit = kind === "slide" ? " mm" : "°";
+  S.preview = { name, arm: kind === "arm" ? c.value : f.aC, scoop: kind === "scoop" ? c.value : (f.sC ?? f.sO), x: kind === "slide" ? c.value : f.x,
+                label: name + (was !== null && was !== c.value ? ` (was ${was}${unit}: ghost)` : "") };
+  if (was !== null && was !== c.value) S.preview.ghost = ghostFor(c, S.preview.arm, S.preview.scoop, was);
+  setJog(S.preview.arm, S.preview.scoop, S.preview.x);
+  if ([...$("capSel").options].some((o) => o.value === name)) $("capSel").value = name;
+  drawAt(S.t);
+}
+function fillDatalists() {
+  const byKind = (k) => M.consts.filter((c) => groupKind(c.group) === k).map((c) => c.name);
+  const opts = (arr) => arr.map((v) => `<option value="${v}"></option>`).join("");
+  $("dl-arm").innerHTML = opts(["HOLD", ...byKind("arm")]);
+  $("dl-via").innerHTML = opts(["NONE", ...byKind("arm")]);
+  $("dl-scoop").innerHTML = opts(["HOLD", ...byKind("scoop")]);
+  $("dl-slide").innerHTML = opts(["HOLD", "0", ...byKind("slide")]);
+  $("dl-speed").innerHTML = opts(["0", ...M.consts.filter((c) => c.name.startsWith("SLIDE_")).map((c) => c.name)]);
+  $("dl-vib").innerHTML = opts(["0", ...M.consts.filter((c) => c.name.startsWith("VIBRATE") && !c.name.includes("PERIOD")).map((c) => c.name)]);
+}
+
+// ============================================================================
+// TIMELINE
+// ============================================================================
+function frameAt(t) {
+  if (S.live && S.live.frame) return S.live.frame;
+  if (!SIM || !SIM.frames.length) return { t: 0, i: 0, aT: -58, aC: -58, sT: 0, sC: 0, sO: 0, x: 0, xT: 0 };
+  const fr = SIM.frames; let lo = 0, hi = fr.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (fr[m].t <= t) lo = m; else hi = m; }
+  return fr[lo];
+}
+const TL = { padL: 44, padR: 50, gantt: 46, strip: 10, hoverEdge: -1, freezeT: null };
+function drawTimeline() {
+  const cv = $("tl"), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  if (!SIM) return;
+  const T = TL.freezeT || Math.max(SIM.total, 0.5), X = (t) => TL.padL + (t / T) * (w - TL.padL - TL.padR);
+  g.font = "11px " + css("--f-data"); g.textBaseline = "middle";
+  // gantt
+  const pal = [css("--arm"), css("--scoop"), css("--slide"), css("--vib"), css("--accent")];
+  SIM.spans.forEach((sp, k) => {
+    const x0 = X(sp.t0), x1 = X(sp.t1 ?? SIM.total);
+    g.fillStyle = k % 2 ? css("--grid") : css("--accent-soft");
+    g.fillRect(x0, 4, Math.max(1, x1 - x0), TL.gantt - 8);
+    if (sp.i === S.sel) { g.strokeStyle = css("--accent"); g.lineWidth = 2; g.strokeRect(x0 + 1, 5, Math.max(1, x1 - x0 - 2), TL.gantt - 10); }
+    g.fillStyle = css("--ink");
+    const label = sp.name, tw = g.measureText(label).width;
+    if (x1 - x0 > tw + 6) g.fillText(label, x0 + 4, TL.gantt / 2);
+    else if (x1 - x0 > 14) g.fillText(String(sp.i), x0 + 3, TL.gantt / 2);
+    if (sp.t1 !== null && (TL.hoverEdge === sp.i || (RT && RT.i === sp.i))) { g.fillStyle = css("--accent"); g.fillRect(x1 - 1.5, 1, 3, TL.gantt - 2); }
+  });
+  // hold strip
+  const y0 = TL.gantt + 2;
+  for (let k = 0; k < SIM.frames.length - 1; k++) {
+    const f = SIM.frames[k], st = holdState(f.aC, f.sC);
+    g.fillStyle = css(st === "hold" ? "--hold" : st === "pour" ? "--pour" : "--level");
+    g.fillRect(X(f.t), y0, Math.max(1, X(SIM.frames[k + 1].t) - X(f.t)) + 0.5, TL.strip);
+  }
+  if (SIM.spill) for (const ts of SIM.spill.at) {
+    const x = X(ts); g.fillStyle = css("--pour"); g.beginPath(); g.moveTo(x, y0 + TL.strip + 1); g.lineTo(x - 5, y0 + TL.strip + 9); g.lineTo(x + 5, y0 + TL.strip + 9); g.fill();
+    g.fillStyle = css("--ink"); g.textAlign = "left"; g.fillText("spill", x + 7, y0 + TL.strip + 6);
+  }
+  // traces
+  const top = y0 + TL.strip + 10, bot = h - 18, ph = bot - top;
+  const aMin = -250, aMax = 120, Ya = (v) => bot - ((v - aMin) / (aMax - aMin)) * ph;
+  const xMax = Math.max(100, ...SIM.frames.map((f) => f.x)) * 1.08, Yx = (v) => bot - (v / xMax) * ph;
+  g.strokeStyle = css("--grid"); g.lineWidth = 1; g.fillStyle = css("--muted");
+  for (const v of [-240, -180, -120, -60, 0, 60, 120]) { const y = Ya(v); g.beginPath(); g.moveTo(TL.padL, y); g.lineTo(w - TL.padR, y); g.stroke(); g.textAlign = "right"; g.fillText(v + "°", TL.padL - 4, y); }
+  g.textAlign = "left";
+  for (const v of [0, 0.5, 1].map((k) => Math.round(xMax / 1.08 * k / 10) * 10)) g.fillText(v + " mm", w - TL.padR + 4, Yx(v));
+  const line = (key, Y, col, width) => { g.strokeStyle = col; g.lineWidth = width; g.beginPath(); SIM.frames.forEach((f, k) => { const x = X(f.t), y = Y(f[key]); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); };
+  line("x", Yx, css("--slide"), 2);
+  line("sO", Ya, css("--scoop"), 1.6);
+  line("aC", Ya, css("--arm"), 2);
+  // time axis
+  g.fillStyle = css("--muted"); g.textAlign = "center";
+  const step = T > 12 ? 2 : T > 5 ? 1 : 0.5;
+  for (let t = 0; t <= T + 1e-6; t += step) g.fillText(t.toFixed(step < 1 ? 1 : 0) + " s", X(t), h - 7);
+  // playhead
+  const px = X(Math.min(S.t, T));
+  g.strokeStyle = css("--accent"); g.lineWidth = 2; g.beginPath(); g.moveTo(px, 2); g.lineTo(px, bot); g.stroke();
+  if (RT) {   // retime label
+    const sp = SIM.spans.find((x) => x.i === RT.i);
+    if (sp && sp.t1 !== null) {
+      const now = Math.round((sp.t1 - sp.t0) * 1000), x1 = X(sp.t1);
+      const lines = [`${sp.name}: ${RT.before} → ${now} ms  (${RT.what()})`].concat(RT.note ? [RT.note] : []);
+      g.font = "12px " + css("--f-data"); const tw = Math.max(...lines.map((l) => g.measureText(l).width)) + 12, th = 16 * lines.length + 6;
+      const bx = Math.min(Math.max(TL.padL, x1 + 8), w - tw - 4);
+      g.fillStyle = css("--panel"); g.strokeStyle = css("--accent"); g.lineWidth = 1; g.fillRect(bx, TL.gantt + 14, tw, th); g.strokeRect(bx + 0.5, TL.gantt + 14.5, tw - 1, th - 1);
+      g.fillStyle = css("--ink"); g.textAlign = "left"; lines.forEach((l, k) => g.fillText(l, bx + 6, TL.gantt + 23 + 16 * k));
+      g.font = "11px " + css("--f-data");
+    }
+  }
+  TL.X = X; TL.T = T; TL.w = w;
+}
+function tlTime(ev) { const r = $("tl").getBoundingClientRect(); const x = ev.clientX - r.left; return Math.min(TL.T, Math.max(0, (x - TL.padL) / (TL.w - TL.padL - TL.padR) * TL.T)); }
+let tlDrag = false, RT = null, rtRaf = 0;
+function tlEdgeAt(ev) {   // step whose END is under the pointer (gantt row only)
+  if (!SIM || !TL.X || ev.offsetY > TL.gantt) return -1;
+  let best = -1, bd = 6;
+  for (const sp of SIM.spans) { if (sp.t1 === null) continue; const d = Math.abs(ev.offsetX - TL.X(sp.t1)); if (d < bd) { bd = d; best = sp.i; } }
+  return best;
+}
+function durWith(i, field, v) {   // step i's duration if one of its fields were v
+  const s = M.steps[i], old = s[field]; s[field] = String(v);
+  const sim = simulate(); s[field] = old;
+  const sp = sim.spans.find((x) => x.i === i);
+  return sp && sp.t1 !== null ? (sp.t1 - sp.t0) * 1000 : Infinity;
+}
+function solveField(i, field, lo, hi, target, round) {   // duration grows with the field: bisect
+  if (durWith(i, field, hi) <= target) return round(hi);
+  if (durWith(i, field, lo) >= target) return round(lo);
+  for (let k = 0; k < 16; k++) { const m = (lo + hi) / 2; if (durWith(i, field, m) < target) lo = m; else hi = m; }
+  return round(hi);
+}
+function applyRetime(target) {
+  const i = RT.i, s = M.steps[i], o = RT.orig, snap10 = (v) => Math.max(0, Math.round(v / 10) * 10);
+  s.waitVal = o.waitVal; s.move = o.move; target = Math.max(0, target);
+  if (s.waitType === "WAIT_MS") s.waitVal = String(snap10(target));
+  else if (s.waitType === "WAIT_ARRIVED") {
+    const base = RT.before - (resolve(o.waitVal, "num") || 0);   // time the moves need
+    if (target >= base) s.waitVal = String(snap10(target - base));
+    else {
+      s.waitVal = "0";
+      const mv = resolve(o.move, "move");
+      if (mv > 0 && (s.arm !== "HOLD" || s.scoop !== "HOLD")) s.move = String(solveField(i, "move", 20, mv, target, (x) => Math.max(20, snap10(x))));
+    }
+  } else s.waitVal = String(solveField(i, "waitVal", 0, 100, target, (x) => Math.round(x)));
+  for (const f of ["waitVal", "move"]) { const el = $(`c${i}_${f}`); if (el) el.value = s[f]; }
+}
+function startRetime(i, e) {
+  const sp = SIM.spans.find((x) => x.i === i); if (!sp) return;
+  togglePlay(false); S.preview = null;
+  const s = M.steps[i];
+  RT = { i, t0: sp.t0, orig: { ...s }, before: Math.round((sp.t1 - sp.t0) * 1000), note: "", target: 0,
+    what: () => { const st = M.steps[i]; return st.waitType === "WAIT_MS" ? `after ${st.waitVal} ms` : st.waitType === "WAIT_ARRIVED" ? (st.move !== RT.orig.move ? `move ${st.move} ms` : `moves finish + ${st.waitVal} ms`) : `${st.waitType === "WAIT_ARM" ? "arm" : "slides"} ${st.waitVal}%`; } };
+  TL.freezeT = Math.max(SIM.total * 1.12, SIM.total + 0.5);
+  $("tl").setPointerCapture(e.pointerId); selectStep(i, false); drawTimeline();
+}
+function moveRetime(e) {
+  RT.target = (tlTime(e) - RT.t0) * 1000;
+  if (rtRaf) return;
+  rtRaf = requestAnimationFrame(() => {
+    rtRaf = 0; if (!RT) return;
+    applyRetime(RT.target); runSim();
+    const sp = SIM.spans.find((x) => x.i === RT.i), now = sp && sp.t1 !== null ? (sp.t1 - sp.t0) * 1000 : 0, st = M.steps[RT.i];
+    RT.note = Math.abs(now - RT.target) < 25 ? "" : now > RT.target
+      ? (st.waitType === "WAIT_ARRIVED" ? "can't be shorter: the moves need this long (speed them up, or use a timed move)" : "can't be shorter")
+      : (st.waitType === "WAIT_ARM" || st.waitType === "WAIT_SLIDE" ? "the move is already at 100% here: use 'after ms' to wait longer" : "can't be longer");
+    drawTimeline();
+  });
+}
+function endRetime(cancel) {
+  if (!RT) return;
+  if (cancel) Object.assign(M.steps[RT.i], RT.orig);
+  const i = RT.i, before = RT.before, changed = ["waitVal", "move"].some((f) => M.steps[i][f] !== RT.orig[f]);
+  RT = null; TL.freezeT = null; cancelAnimationFrame(rtRaf); rtRaf = 0;
+  renderTable(); renderInspector();
+  if (changed) { markDirty(); runSim(); const sp = SIM.spans.find((x) => x.i === i); toast(`${M.steps[i].name}: ${before} → ${Math.round((sp.t1 - sp.t0) * 1000)} ms`); }
+  else runSim();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && RT) endRetime(true); });
+$("tl").addEventListener("pointerdown", (e) => {
+  const ei = tlEdgeAt(e);
+  if (ei >= 0) { startRetime(ei, e); return; }
+  tlDrag = true; $("tl").setPointerCapture(e.pointerId); S.preview = null;
+  S.t = tlTime(e);
+  if (e.offsetY < TL.gantt && SIM) { const sp = SIM.spans.find((x) => S.t >= x.t0 && S.t < (x.t1 ?? 1e9)); if (sp) selectStep(sp.i, false); }
+  drawAt(S.t);
+});
+$("tl").addEventListener("pointermove", (e) => {
+  if (RT) { moveRetime(e); return; }
+  if (tlDrag) { S.t = tlTime(e); drawAt(S.t); return; }
+  const ei = tlEdgeAt(e), cv = $("tl");
+  cv.style.cursor = ei >= 0 ? "col-resize" : e.offsetY < TL.gantt ? "pointer" : "default";
+  cv.title = ei >= 0 ? `Drag to change how long ${M.steps[ei] ? M.steps[ei].name : ""} takes` : "";
+  if (ei !== TL.hoverEdge) { TL.hoverEdge = ei; drawTimeline(); }
+});
+$("tl").addEventListener("pointerleave", () => { if (TL.hoverEdge >= 0 && !RT) { TL.hoverEdge = -1; drawTimeline(); } });
+$("tl").addEventListener("pointerup", () => { tlDrag = false; if (RT) endRetime(false); });
+$("tl").addEventListener("pointercancel", () => { tlDrag = false; if (RT) endRetime(true); });
+$("scrub").addEventListener("input", (e) => { if (!SIM) return; S.preview = null; S.t = (+e.target.value / 1000) * SIM.total; drawAt(S.t); });
+const ICON_PLAY = '<svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>', ICON_PAUSE = '<svg viewBox="0 0 16 16"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>';
+function setPlayUi() { $("btnPlay").textContent = S.playing ? "Pause" : "Play"; $("tbPlay").innerHTML = S.playing ? ICON_PAUSE : ICON_PLAY; $("tbPlay").setAttribute("aria-label", S.playing ? "Pause" : "Play"); }
+function togglePlay(on) {
+  const want = on === undefined ? !S.playing : on;
+  if (want && !S.playing) { if (SIM && S.t >= SIM.total - 0.01) S.t = 0; S.preview = null; lastTick = performance.now(); S.playing = true; requestAnimationFrame(tick); }
+  else S.playing = want;
+  setPlayUi();
+}
+$("btnPlay").onclick = () => togglePlay(); $("tbPlay").onclick = () => togglePlay();
+function setRate(v) { S.rate = +v; $("playRate").value = v; $("tbRate").value = v; }
+$("playRate").onchange = (e) => setRate(e.target.value); $("tbRate").onchange = (e) => setRate(e.target.value);
+function stepJump(dir) {   // -1 = start of this step (or the one before), +1 = next step
+  if (!SIM || !SIM.spans.length) return;
+  togglePlay(false);
+  const sp = SIM.spans; let k = sp.findIndex((x) => S.t >= x.t0 - 1e-6 && S.t < (x.t1 ?? 1e9)); if (k < 0) k = sp.length;
+  if (dir < 0) k = k < sp.length && S.t - sp[k].t0 > 0.15 ? k : Math.max(0, k - 1); else k = k + 1;
+  if (k >= sp.length) { S.preview = null; S.t = SIM.total; drawAt(S.t); return; }
+  selectStep(sp[k].i, true);
+}
+$("tbPrev").onclick = () => stepJump(-1); $("tbNext").onclick = () => stepJump(1);
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !(e.key === " " || e.key === "ArrowLeft" || e.key === "ArrowRight")) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, button, [contenteditable]")) return;
+  e.preventDefault();
+  if (e.key === " ") togglePlay(); else stepJump(e.key === "ArrowLeft" ? -1 : 1);
+});
+let lastTick = 0;
+function tick(now) {
+  if (!S.playing) return;
+  const dt = Math.min(0.1, (now - lastTick) / 1000); lastTick = now;   // no jump after a hidden tab
+  S.t += dt * S.rate;
+  if (SIM && S.t >= SIM.total) { S.t = SIM.total; S.playing = false; setPlayUi(); }
+  drawAt(S.t);
+  if (S.playing) requestAnimationFrame(tick);
+}
+function drawAt(t) {
+  if (!SIM) return;
+  $("tNow").textContent = t.toFixed(2) + " s";
+  $("tbTime").textContent = t.toFixed(2) + " / " + SIM.total.toFixed(2) + " s";
+  $("scrub").value = SIM.total > 0 ? Math.round((t / SIM.total) * 1000) : 0;
+  const f = frameAt(t), p = S.preview;
+  const armDeg = p ? p.arm : f.aC, scDeg = p ? p.scoop : f.sO, x = p ? p.x : f.x;
+  const name = S.live && S.live.frame ? "LIVE · " + (S.live.stepName || "") : p ? "Preview · " + p.label : (M.steps[f.i] ? M.steps[f.i].name : "DONE");
+  $("hudStep").textContent = name;
+  $("hudVals").innerHTML = `<span><i>arm</i> ${armDeg.toFixed(1)}°</span><span><i>scoop</i> ${scDeg.toFixed(1)}°</span><span><i>slides</i> ${Math.round(x)} mm</span>${f.vib && !p ? "<span><i>vibrating</i></span>" : ""}`;
+  const hs = holdState(armDeg, scDeg), tag = $("hudHold");
+  tag.textContent = hs === "hold" ? "scoop holds rocks" : hs === "pour" ? "scoop pours" : "scoop level";
+  tag.style.background = css(hs === "hold" ? "--hold" : hs === "pour" ? "--pour" : "--level");
+  document.querySelectorAll("#stepTable tbody tr").forEach((tr) => tr.classList.toggle("play", +tr.dataset.i === f.i));
+  drawTimeline();
+  T3.ok && T3.pose(armDeg, scDeg, x, p ? (p.ghost || null) : { arm: f.aT, scoop: f.sT, x: f.xT });
+}
+
+// ============================================================================
+// 3D TWIN  (geometry from tools/twin_model.js, joints as in the run viewer)
+// ============================================================================
+const FIELD_X0 = 35, FIELD_Y0 = 439;
+const HOPPER = { xf: 2102.5, yf: 900, rim: 732, r: 55 };
+const T3 = { ok: false };
+const TW = (() => { try { return Object.assign({ tilt: 14.9 }, JSON.parse(localStorage.getItem("dover-seq-twin") || "{}")); } catch (e) { return { tilt: 14.9 }; } })();
+function saveTw() { try { localStorage.setItem("dover-seq-twin", JSON.stringify(TW)); } catch (e) {} }
+function initTwin() {
+  const THREE = window.THREE, MD = window.DOVER_MODEL, canvas = $("twin3d");
+  if (!THREE || !MD) { canvas.replaceWith(Object.assign(document.createElement("div"), { className: "nowebgl", textContent: "3D model not loaded: keep three.min.js and twin_model.js next to this page." })); return; }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); } catch (e) { return; }
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1.6, 5, 20000);
+  camera.up.set(0, 0, 1);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(800, 1400, 2000); scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(-1500, -800, 600); scene.add(fill);
+  const b64 = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+  const mats = {}, matFor = (c) => mats[c] || (mats[c] = new THREE.MeshStandardMaterial({ color: MD.colours[c] || "#333", roughness: 0.55, metalness: ["gold", "brass", "alu", "steel"].includes(c) ? 0.55 : 0.1, flatShading: true }));
+  const geoms = {};
+  for (const [name, parts] of Object.entries(MD.bodies)) {
+    geoms[name] = parts.map((pt) => {
+      const q = new Uint16Array(b64(pt.pos)), pos = new Float32Array(q.length);
+      for (let i = 0; i < q.length; i += 3) { pos[i] = MD.qmin[0] + q[i] * MD.qscale[0]; pos[i + 1] = MD.qmin[1] + q[i + 1] * MD.qscale[1]; pos[i + 2] = MD.qmin[2] + q[i + 2] * MD.qscale[2]; }
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(new Uint32Array(b64(pt.idx)), 1));
+      return { g, colour: pt.colour };
+    });
+  }
+  const body = (name, mat) => { const grp = new THREE.Group(); for (const { g, colour } of geoms[name] || []) grp.add(new THREE.Mesh(g, mat || matFor(colour))); return grp; };
+  const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+  const PA = V3(MD.pivots.arm), PS = V3(MD.pivots.scoop), PP = V3(MD.pivots.slide);
+  const AX = V3(MD.slideAxis).normalize(), TILT = V3(MD.slideTiltAxis).normalize();
+  const robot = new THREE.Group(); scene.add(robot); const baseBody = body("base"); robot.add(baseBody);
+  const armPivot = new THREE.Group(); armPivot.position.copy(PA); robot.add(armPivot); armPivot.add(body("arm"));
+  const scoopPivot = new THREE.Group(); scoopPivot.position.copy(PS).sub(PA); armPivot.add(scoopPivot); scoopPivot.add(body("scoop"));
+  const ghostMat = new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.22, depthWrite: false });
+  const armGhost = new THREE.Group(); armGhost.position.copy(PA); robot.add(armGhost); armGhost.add(body("arm", ghostMat));
+  const scoopGhost = new THREE.Group(); scoopGhost.position.copy(PS).sub(PA); armGhost.add(scoopGhost); scoopGhost.add(body("scoop", ghostMat));
+  const slideRoot = new THREE.Group(); slideRoot.position.copy(PP); robot.add(slideRoot);
+  const stages = []; for (let k = 0; k < MD.stages; k++) { const s = body("stage" + k); slideRoot.add(s); stages.push(s); }
+  const bucket = body("bucket"); slideRoot.add(bucket);
+  // field (2026 rules drawings), same as the run viewer
+  const field = new THREE.Group(); scene.add(field);
+  const R = (xf, yf, z) => new THREE.Vector3(FIELD_X0 - xf, FIELD_Y0 - yf, z);
+  const fm = { board: new THREE.MeshStandardMaterial({ color: 0x3b3530, roughness: 0.9 }), dar: new THREE.MeshStandardMaterial({ color: 0xc9a46a, roughness: 0.8 }),
+    ply: new THREE.MeshStandardMaterial({ color: 0x4a423a, roughness: 0.85 }), pipe: new THREE.MeshStandardMaterial({ color: 0xb0b4b8, roughness: 0.4, metalness: 0.5 }),
+    pvc: new THREE.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.6, side: THREE.DoubleSide }), ramp: new THREE.MeshStandardMaterial({ color: 0xe0bd2c, roughness: 0.7 }),
+    line: new THREE.LineBasicMaterial({ color: 0xf2f0ea }), rim: new THREE.MeshBasicMaterial({ color: 0xe3a92c }) };
+  const box = (x0, x1, y0, y1, z0, z1, mat) => { const a = R(x0, y0, z0), b = R(x1, y1, z1); const m = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(b.x - a.x), Math.abs(b.y - a.y), Math.abs(b.z - a.z)), mat); m.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); field.add(m); };
+  const rect = (x0, x1, y0, y1) => { const pts = [R(x0, y0, 0.8), R(x1, y0, 0.8), R(x1, y1, 0.8), R(x0, y1, 0.8), R(x0, y0, 0.8)]; field.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), fm.line)); };
+  box(0, 2400, 0, 1200, -17, 0, fm.board);
+  rect(0, 400, 400, 1200); rect(0, 625, 0, 1200); rect(1805, 2400, 400, 1200);
+  box(0, 400, 0, 30, 0, 30, fm.dar); box(0, 400, 370, 400, 0, 30, fm.dar); box(0, 30, 30, 370, 0, 30, fm.dar); box(370, 400, 30, 370, 0, 30, fm.dar);
+  box(1805, 2400, 400, 1200, 250, 267, fm.ply); box(1805, 2400, 400, 1200, 417, 434, fm.ply);
+  for (const [xf, yf] of [[1880, 475], [2325, 475], [1880, 1125], [2325, 1125]]) for (const [z0, z1] of [[0, 250], [267, 417]]) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, z1 - z0, 16), fm.pipe); c.rotation.x = Math.PI / 2; c.position.copy(R(xf, yf, (z0 + z1) / 2)); field.add(c);
+  }
+  const hop = new THREE.Mesh(new THREE.CylinderGeometry(HOPPER.r, HOPPER.r, HOPPER.rim - 434, 40, 1, true), fm.pvc); hop.rotation.x = Math.PI / 2; hop.position.copy(R(HOPPER.xf, HOPPER.yf, (HOPPER.rim + 434) / 2)); field.add(hop);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(HOPPER.r, 3, 8, 48), fm.rim); rim.position.copy(R(HOPPER.xf, HOPPER.yf, HOPPER.rim)); field.add(rim);
+  const rampLen = 1200, rampRise = 267, rampRun = Math.sqrt(rampLen * rampLen - rampRise * rampRise);
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(rampLen, 400, 18), fm.ramp); ramp.position.copy(R(1805 - rampRun / 2, 1000, rampRise / 2 + 9)); ramp.rotation.y = Math.atan2(rampRise, rampRun); field.add(ramp);
+  // camera: Fusion 360 / Inventor style
+  //   wheel = zoom at the cursor, middle-drag = pan, Shift + middle-drag = orbit about the point
+  //   under the cursor, double-click (middle or left) = fit. Left-drag orbits / Shift+left pans (trackpads).
+  const PRESETS = { robot: { target: [-165, -40, 170], r: 1500, az: 0.95, el: 0.38 }, side: { target: [-165, -40, 180], r: 1500, az: 0.0, el: 0.05 }, track: { target: [-1050, -260, 280], r: 3900, az: 0.62, el: 0.52 } };
+  const tgt = new THREE.Vector3(), ZUP = new THREE.Vector3(0, 0, 1);
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const pickables = [baseBody, armPivot, slideRoot, field];
+  const place = () => { if (camera.position.distanceTo(tgt) < 30) tgt.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 30); camera.lookAt(tgt); request(); };
+  const setCam = (t, r, az, el) => { tgt.set(...t); const ce = Math.cos(el); camera.position.set(tgt.x + r * ce * Math.cos(az), tgt.y + r * ce * Math.sin(az), tgt.z + r * Math.sin(el)); place(); };
+  const setPreset = (k) => { const p = PRESETS[k] || PRESETS.robot; setCam(p.target, p.r, p.az, p.el); };
+  function pickAt(cx, cy) {   // world point under the cursor: the model if hit, else on the focus plane
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(pickables, true).find((x) => x.object.isMesh);
+    if (hit) return { p: hit.point.clone(), hit: true };
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), tgt), q = new THREE.Vector3();
+    return { p: ray.ray.intersectPlane(plane, q) ? q : tgt.clone(), hit: false };
+  }
+  function fit() {
+    robot.updateMatrixWorld(true);
+    const box = new THREE.Box3(); for (const o of [baseBody, armPivot, slideRoot]) box.expandByObject(o);
+    const sph = box.getBoundingSphere(new THREE.Sphere()), fwd = camera.getWorldDirection(new THREE.Vector3());
+    const vf = camera.fov * DEG, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+    const d = sph.radius / Math.sin(Math.min(vf, hf) / 2) * 1.05;
+    tgt.copy(sph.center); camera.position.copy(sph.center).addScaledVector(fwd, -d); place();
+  }
+  let zoomPt = null, zoomAt = 0, zoomXY = [0, 0];
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const now = performance.now();
+    if (!zoomPt || now - zoomAt > 250 || Math.hypot(e.clientX - zoomXY[0], e.clientY - zoomXY[1]) > 4) zoomPt = pickAt(e.clientX, e.clientY).p;
+    zoomAt = now; zoomXY = [e.clientX, e.clientY];
+    let dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    if (TW.revZoom) dy = -dy;
+    let s = Math.exp(Math.max(-250, Math.min(250, dy)) * (e.ctrlKey ? 0.01 : 0.0015));   // > 1 = out
+    const d = camera.position.distanceTo(zoomPt);
+    if (d * s < 40) s = 40 / d; if (d * s > 15000) s = 15000 / d;
+    camera.position.sub(zoomPt).multiplyScalar(s).add(zoomPt); tgt.sub(zoomPt).multiplyScalar(s).add(zoomPt);
+    place();
+  }, { passive: false });
+  let drag = null, lastMid = 0, lastMidXY = [0, 0];
+  canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });   // no middle-click autoscroll
+  canvas.addEventListener("auxclick", (e) => e.preventDefault());
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button === 1) {   // double-click the middle button = fit (Fusion / Inventor)
+      const now = performance.now();
+      if (now - lastMid < 400 && Math.hypot(e.clientX - lastMidXY[0], e.clientY - lastMidXY[1]) < 6) { lastMid = 0; fit(); return; }
+      lastMid = now; lastMidXY = [e.clientX, e.clientY];
+    }
+    const mode = e.button === 1 ? (e.shiftKey ? "orbit" : "pan") : e.button === 0 ? (e.shiftKey ? "pan" : "orbit") : e.button === 2 ? "pan" : null;
+    if (!mode) return;
+    const pk = pickAt(e.clientX, e.clientY);
+    drag = { x: e.clientX, y: e.clientY, mode, pivot: pk.hit ? pk.p : tgt.clone(), depth: camera.getWorldDirection(new THREE.Vector3()).dot(pk.p.clone().sub(camera.position)) };
+    canvas.setPointerCapture(e.pointerId); canvas.style.cursor = mode === "pan" ? "move" : "grabbing";
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.mode === "pan") {   // the grabbed point stays under the cursor
+      const wpp = 2 * Math.max(20, drag.depth) * Math.tan(camera.fov * DEG / 2) / canvas.clientHeight;
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      const mv = right.multiplyScalar(-dx * wpp).add(up.multiplyScalar(dy * wpp));
+      camera.position.add(mv); tgt.add(mv);
+    } else {                     // turntable orbit about the pivot, Z stays up
+      const C = drag.pivot, fwd = tgt.clone().sub(camera.position).normalize();
+      const el = -Math.asin(Math.max(-1, Math.min(1, fwd.z)));
+      const el2 = Math.max(-88 * DEG, Math.min(88 * DEG, el + dy * 0.006));
+      const right = new THREE.Vector3().crossVectors(fwd, ZUP).normalize();
+      const q = new THREE.Quaternion().setFromAxisAngle(ZUP, -dx * 0.008).multiply(new THREE.Quaternion().setFromAxisAngle(right, -(el2 - el)));
+      camera.position.sub(C).applyQuaternion(q).add(C); tgt.sub(C).applyQuaternion(q).add(C);
+    }
+    place();
+  });
+  const endDrag = () => { drag = null; canvas.style.cursor = ""; };
+  canvas.addEventListener("pointerup", endDrag); canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("dblclick", fit);
+  let pending = false;
+  function request() { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; resize(); renderer.render(scene, camera); }); }
+  function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; const c = renderer.getSize(new THREE.Vector2()); if (c.x !== w || c.y !== h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } }
+  function theme() { scene.background = new THREE.Color(css("--bg") || "#eef0ec"); request(); }
+  function pose(armDeg, scoopDeg, xmm, ghost) {
+    armPivot.rotation.x = -armDeg * DEG; scoopPivot.rotation.x = scoopDeg * DEG;       // scoop: + = rotation about +X (CAD)
+    const q = new THREE.Quaternion().setFromAxisAngle(TILT, TW.tilt * DEG); slideRoot.quaternion.copy(q);
+    const ext = Math.max(0, xmm);
+    stages.forEach((s, k) => s.position.copy(AX).multiplyScalar(ext * k / (MD.stages - 1))); bucket.position.copy(AX).multiplyScalar(ext);
+    if (ghost && (Math.abs(ghost.arm - armDeg) > 1 || Math.abs(ghost.scoop - scoopDeg) > 1.5)) { armGhost.visible = true; armGhost.rotation.x = -ghost.arm * DEG; scoopGhost.rotation.x = ghost.scoop * DEG; }
+    else armGhost.visible = false;
+    request();
+  }
+  Object.assign(T3, { ok: true, pose, setPreset, setCam, fit, theme, request });
+  setPreset("robot"); theme();
+  new ResizeObserver(() => request()).observe(canvas);
+}
+$("viewSel").onchange = (e) => T3.ok && T3.setPreset(e.target.value);
+$("tiltIn").value = TW.tilt;
+$("revZoom").checked = !!TW.revZoom;
+$("revZoom").onchange = (e) => { TW.revZoom = e.target.checked; saveTw(); };
+$("tiltIn").oninput = (e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) { TW.tilt = v; saveTw(); drawAt(S.t); } };
+
+// ============================================================================
+// FILES
+// ============================================================================
+const F = { seqHandle: null, cfgHandle: null, dirHandle: null, label: "" };
+function setFileChip(label) {
+  if (label !== undefined) F.label = label;
+  const el = $("fileChip");
+  el.innerHTML = F.label;
+  el.classList.toggle("dirty", M.dirty || M.cfgDirty);
+  $("btnSave").disabled = !F.seqHandle;
+  $("btnSave").title = F.seqHandle ? "Save to " + F.seqHandle.name + " (Ctrl+S)" : "Open the robot folder first (Chrome / Edge), or use Download / Copy";
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+async function idb(op, key, val) {
+  try {
+    const db = await new Promise((res, rej) => { const r = indexedDB.open("dover-seq", 1); r.onupgradeneeded = () => r.result.createObjectStore("h"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    return await new Promise((res, rej) => { const tx = db.transaction("h", op === "get" ? "readonly" : "readwrite"); const st = tx.objectStore("h"); const rq = op === "get" ? st.get(key) : st.put(val, key); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
+  } catch (e) { return null; }
+}
+async function openDir(handle) {
+  const dir = handle || await window.showDirectoryPicker({ id: "dover", mode: "readwrite" });
+  if ((await dir.queryPermission({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission({ mode: "readwrite" })) !== "granted") throw new Error("Permission to edit the folder was not given.");
+  let sub = dir;
+  try { await dir.getFileHandle("Sequence.h"); } catch (e) { sub = await dir.getDirectoryHandle("Robot_Controller_V2_1"); }   // picked the repo root
+  const sh = await sub.getFileHandle("Sequence.h");
+  loadSequence(await (await sh.getFile()).text(), `<b>${esc(sub.name)}/Sequence.h</b>`);
+  F.seqHandle = sh; F.dirHandle = dir;
+  try { const ch = await sub.getFileHandle("RobotConfig.h"); loadConfig(await (await ch.getFile()).text()); F.cfgHandle = ch; } catch (e) { F.cfgHandle = null; }
+  await idb("put", "dir", dir);
+  afterLoad(); toast("Opened " + sub.name);
+}
+$("btnOpenDir").onclick = async () => {
+  if (!window.showDirectoryPicker) { toast("This browser can't open folders. Use Open file, then Download or Copy."); return; }
+  try { await openDir(); } catch (e) { if (e.name !== "AbortError") toast(e.message); }
+};
+$("btnOpenFile").onclick = async () => {
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await window.showOpenFilePicker({ id: "dover", types: [{ description: "Sequence.h", accept: { "text/plain": [".h"] } }] });
+      loadSequence(await (await h.getFile()).text(), `<b>${esc(h.name)}</b>`); F.seqHandle = h; F.cfgHandle = null; afterLoad();
+    } catch (e) { if (e.name !== "AbortError") toast(e.message); }
+  } else $("fileInput").click();
+};
+$("fileInput").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { loadSequence(await f.text(), `<b>${esc(f.name)}</b> (read only: Download to save)`); F.seqHandle = null; afterLoad(); } catch (err) { toast(err.message); } };
+async function save() {
+  if (!F.seqHandle) { toast("No file open for writing. Use Download or Copy."); return; }
+  try {
+    const txt = sequenceText();
+    let w = await F.seqHandle.createWritable(); await w.write(txt); await w.close();
+    M.doc = parseHeader(txt); M.consts = M.doc.consts.map((c) => ({ ...c })); M.steps = M.doc.steps.map((s) => ({ ...s })); M.dirty = false;
+    if (M.cfgDirty && F.cfgHandle) { const ct = configText(); w = await F.cfgHandle.createWritable(); await w.write(ct); await w.close(); M.cfgDoc = parseHeader(ct); M.cfgConsts = M.cfgDoc.consts.map((c) => ({ ...c })); M.cfgDirty = false; }
+    setFileChip(); renderTable(); toast("Saved. Upload Robot_Controller_V2_1.ino to use it.");
+  } catch (e) { toast("Save failed: " + e.message); }
+}
+$("btnSave").onclick = save;
+document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } });
+$("btnCopy").onclick = async () => { const txt = sequenceText(); try { await navigator.clipboard.writeText(txt); toast("Sequence.h copied"); } catch (e) { toast("Copy blocked by the browser. Use Download."); } };
+$("btnDownload").onclick = () => {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([sequenceText()], { type: "text/plain" })); a.download = "Sequence.h"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast("Downloaded. Replace Robot_Controller_V2_1/Sequence.h with it.");
+};
+window.addEventListener("beforeunload", (e) => { if (M.dirty || M.cfgDirty) { e.preventDefault(); e.returnValue = ""; } });
+function afterLoad() { S.sel = -1; S.preview = null; renderTable(); renderValues(); renderCal(); runSim(); setFileChip(); jogInfo(); renderInspector(); }
+
+// ============================================================================
+// CALIBRATION
+// ============================================================================
+function renderCal() {
+  const host = $("pane-cal"), haveCfg = !!F.cfgHandle;
+  const f = (k) => (Math.round(cfgv(k) * 100) / 100);
+  host.innerHTML = `
+    <p class="hint">Reference pose: scoop laid flat on the intake floor. The CAD says that is arm <b class="mono">${f("CAL_ARM_DEG")}°</b>, scoop <b class="mono">${f("CAL_SCOOP_DEG")}°</b>.
+      Find the pulse widths with <span class="mono">calibration/Servo_Offset_Cal</span>, then enter them here.</p>
+    <div class="btns"><button id="calShow">Show reference pose</button></div>
+    <div class="kv">
+      <label for="calR">Right arm µs</label><input id="calR" class="num" type="number" step="1" value="${f("ARM_R_CAL_US")}">
+      <label for="calL">Left arm µs</label><input id="calL" class="num" type="number" step="1" value="${f("ARM_L_CAL_US")}">
+      <label for="calS">Scoop µs</label><input id="calS" class="num" type="number" step="1" value="${f("SCOOP_CAL_US")}">
+    </div>
+    <fieldset style="border:1px solid var(--line);border-radius:6px;padding:8px 10px">
+      <legend class="hint">When the numbers change</legend>
+      <label style="display:flex;gap:8px;align-items:flex-start"><input type="radio" name="calMode" id="calKeepUs" value="us" checked><span><b>Keep the robot's motion.</b> Pulse widths stay the same, the angles in Sequence.h are re-worked so the twin matches the robot. Use this the first time (V2 positions are right).</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="radio" name="calMode" id="calKeepDeg" value="deg"><span><b>Keep the angles.</b> The robot moves to match the angles already in Sequence.h.</span></label>
+    </fieldset>
+    <div class="btns"><button id="calApply" class="primary">Apply calibration</button></div>
+    <div id="calOut" class="hint"></div>
+    <h3>Scale check (optional)</h3>
+    <p class="hint">Confirms the servos really are 300° (8.0 µs per arm degree, 6.667 per scoop degree). Jog the arm until the posts are vertical (phone level on a post) and the scoop blade is level, then enter the pulses the cal sketch shows.</p>
+    <div class="kv">
+      <label for="scR">Right arm µs at vertical</label><input id="scR" class="num" type="number" step="1">
+      <label for="scS">Scoop µs, blade level</label><input id="scS" class="num" type="number" step="1">
+    </div>
+    <div class="btns"><button id="scCalc">Work out scale</button></div>
+    <div id="scOut" class="hint"></div>
+    ${haveCfg ? "" : `<p class="callout">RobotConfig.h isn't open, so results are shown as lines to paste. Open the robot folder to apply them directly.</p>`}`;
+  $("calShow").onclick = () => { S.preview = { arm: cfgv("CAL_ARM_DEG"), scoop: cfgv("CAL_SCOOP_DEG"), x: 0, label: "reference (scoop flat)" }; drawAt(S.t); };
+  $("calApply").onclick = applyCal;
+  $("scCalc").onclick = calcScale;
+}
+function setCfg(name, value) {
+  M.cfg[name] = value;
+  const c = M.cfgConsts.find((x) => x.name === name); if (c) { c.value = value; M.cfgDirty = true; }
+}
+function applyCal() {
+  const R = parseFloat($("calR").value), L = parseFloat($("calL").value), Su = parseFloat($("calS").value);
+  if ([R, L, Su].some(isNaN)) { $("calOut").textContent = "Enter all three pulse widths."; return; }
+  const keepUs = $("calKeepUs").checked, changes = [];
+  if (keepUs) {
+    // pulse widths each named angle produces now
+    const before = M.consts.map((c) => ({ c, kind: groupKind(c.group), us: groupKind(c.group) === "arm" ? armUs(c.value) : groupKind(c.group) === "scoop" ? scoopUs(c.value) : null }));
+    setCfg("ARM_R_CAL_US", R); setCfg("ARM_L_CAL_US", L); setCfg("SCOOP_CAL_US", Su);
+    for (const b of before) {
+      if (b.kind === "arm") {
+        const dr = cfgv("CAL_ARM_DEG") + (b.us.r - R) / (cfgv("ARM_R_DIR") * cfgv("ARM_US_PER_DEG"));
+        const dl = cfgv("CAL_ARM_DEG") + (b.us.l - L) / (cfgv("ARM_L_DIR") * cfgv("ARM_US_PER_DEG"));
+        const nv = Math.round(((dr + dl) / 2) * 10) / 10; if (nv !== b.c.value) changes.push(`${b.c.name} ${b.c.value} → ${nv}`); b.c.value = nv;
+      } else if (b.kind === "scoop") {
+        const nv = Math.round((cfgv("CAL_SCOOP_DEG") + (b.us - Su) / (cfgv("SCOOP_DIR") * cfgv("SCOOP_US_PER_DEG"))) * 10) / 10;
+        if (nv !== b.c.value) changes.push(`${b.c.name} ${b.c.value} → ${nv}`); b.c.value = nv;
+      }
+    }
+    M.dirty = changes.length > 0 || M.dirty;
+  } else { setCfg("ARM_R_CAL_US", R); setCfg("ARM_L_CAL_US", L); setCfg("SCOOP_CAL_US", Su); }
+  const paste = `const float ARM_R_CAL_US = ${fmtNum(R)};\nconst float ARM_L_CAL_US = ${fmtNum(L)};\nconst float SCOOP_CAL_US = ${fmtNum(Su)};`;
+  $("calOut").innerHTML = (F.cfgHandle ? "RobotConfig.h updated (Save to write it). " : `Paste into RobotConfig.h:<pre class="mono" style="white-space:pre-wrap">${paste}</pre>`) +
+    (keepUs ? (changes.length ? `Angles re-worked: <span class="mono">${changes.join(", ")}</span>.` : "No angles needed to change.") : "Angles unchanged; the robot will move to match them.");
+  setFileChip(); renderValues(); renderTable(); scheduleSim();
+}
+function calcScale() {
+  const R = parseFloat($("scR").value), Sv = parseFloat($("scS").value), out = [];
+  const Rc = parseFloat($("calR").value), Sc = parseFloat($("calS").value);
+  if (!isNaN(R) && !isNaN(Rc)) out.push(`Arm: ${(Math.abs(R - Rc) / Math.abs(cfgv("CAL_ARM_DEG") - 0)).toFixed(2)} µs/° (300° servos through 40T:48T = 8.00)`);
+  if (!isNaN(Sv) && !isNaN(Sc)) out.push(`Scoop: ${(Math.abs(Sv - Sc) / Math.abs(cfgv("CAL_SCOOP_DEG") - 0)).toFixed(3)} µs/° (300° servo = 6.667)`);
+  $("scOut").textContent = out.length ? out.join(" · ") + ". More than ~3% off: tell your agent, the servo scale in RobotConfig.h needs changing." : "Enter the reference pulses above and at least one of these.";
+}
+
+// ============================================================================
+// LIVE LINK  (Web Serial, Chrome / Edge)
+// ============================================================================
+const LIVE = { port: null, reader: null, writer: null, buf: "", stepNames: [] };
+function logc(s) { const c = $("console"); c.textContent += s + "\n"; if (c.textContent.length > 20000) c.textContent = c.textContent.slice(-15000); c.scrollTop = c.scrollHeight; }
+async function liveSend(cmd) { if (!LIVE.writer) return; await LIVE.writer.write(new TextEncoder().encode(cmd + "\n")); logc("> " + cmd); }
+function liveSendAngle(kind, v) { if (!S.live) { toast("Connect the robot first (Live link tab)."); return; } liveSend((kind === "arm" ? "A " : "S ") + v.toFixed(1)); syncJog(kind, v); jogInfo(); }
+function setLiveUi(on) {
+  for (const id of ["btnDisconnect", "btnSendSlide", "btnRunAll", "btnRunSel", "btnStepMode", "btnNext", "btnStop", "speedSel"]) $(id).disabled = !on;
+  $("btnConnect").disabled = on; renderValues();
+}
+$("btnConnect").onclick = async () => {
+  if (!("serial" in navigator)) { toast("Web Serial needs Chrome or Edge, opened from the file on your computer."); return; }
+  try {
+    LIVE.port = await navigator.serial.requestPort();
+    await LIVE.port.open({ baudRate: 115200 });
+    LIVE.writer = LIVE.port.writable.getWriter();
+    S.live = { frame: null, stepName: "" }; setLiveUi(true); $("liveState").textContent = "connected, waiting for the robot…";
+    readLoop();
+  } catch (e) { if (e.name !== "NotFoundError") toast("Couldn't connect: " + e.message); }
+};
+$("btnDisconnect").onclick = liveClose;
+async function liveClose() {
+  try { if (LIVE.reader) await LIVE.reader.cancel(); } catch (e) {}
+  try { if (LIVE.writer) LIVE.writer.releaseLock(); } catch (e) {}
+  try { if (LIVE.port) await LIVE.port.close(); } catch (e) {}
+  Object.assign(LIVE, { port: null, reader: null, writer: null }); S.live = null; setLiveUi(false); $("liveState").textContent = "not connected"; drawAt(S.t);
+}
+async function readLoop() {
+  const dec = new TextDecoder();
+  try {
+    LIVE.reader = LIVE.port.readable.getReader();
+    for (;;) {
+      const { value, done } = await LIVE.reader.read(); if (done) break;
+      LIVE.buf += dec.decode(value, { stream: true });
+      let k; while ((k = LIVE.buf.indexOf("\n")) >= 0) { const line = LIVE.buf.slice(0, k).trim(); LIVE.buf = LIVE.buf.slice(k + 1); if (line) onLine(line); }
+    }
+  } catch (e) { logc("! " + e.message); }
+  finally { try { LIVE.reader.releaseLock(); } catch (e) {} }
+}
+let lastD = 0;
+function onLine(line) {
+  if (line.startsWith("D,")) {
+    const p = line.split(","); if (p.length < 17) return;
+    const st = +p[2];
+    S.live.frame = { t: S.t, i: st - 1, aT: (650 - +p[4]) / 5, aC: (650 - +p[5]) / 5, sT: (+p[6] - 2300) / 6.667, sC: (+p[7] - 2300) / 6.667, sO: (+p[8] - 2300) / 6.667, x: +p[11] * mmPerCount(), xT: +p[9] * mmPerCount(), vib: (+p[15] & 8) > 0 };
+    S.live.stepName = LIVE.stepNames[st] || "";
+    const now = performance.now(); if (now - lastD > 50) { lastD = now; drawAt(S.t); }
+    $("liveState").textContent = `live · ${S.live.stepName || "idle"}`;
+    return;
+  }
+  if (line.startsWith("#STATES,")) LIVE.stepNames = line.split(",").slice(1);
+  logc(line);
+}
+// ---- jog: poses the twin with no robot, and drives the robot too when connected ----
+const JOG_IDS = { arm: ["jogArm", "jogArmN"], scoop: ["jogScoop", "jogScoopN"], slide: ["jogSlide", "jogSlideN"] };
+function jogVal(kind) { return parseFloat($(JOG_IDS[kind][1]).value) || 0; }
+function syncJog(kind, v) { const r = Math.round(+v * 10) / 10; $(JOG_IDS[kind][0]).value = r; $(JOG_IDS[kind][1]).value = r; }
+function setJog(arm, scoop, x) { syncJog("arm", arm); syncJog("scoop", scoop); syncJog("slide", x); jogInfo(); }
+function jogInfo() {
+  const a = jogVal("arm"), s = jogVal("scoop"), x = jogVal("slide"), u = armUs(a), hs = holdState(a, s);
+  $("jogHold").innerHTML = `<span class="dot" style="background:var(--${hs})"></span> scoop ${hs === "hold" ? "holds rocks" : hs === "pour" ? "pours" : "is level"} · pulses R ${Math.round(u.r)} · L ${Math.round(u.l)} · scoop ${Math.round(scoopUs(s))} µs · slides ${Math.round(x / mmPerCount())} counts`;
+}
+function jogShow() {
+  if (S.playing) togglePlay(false);
+  S.preview = { name: "__jog", arm: jogVal("arm"), scoop: jogVal("scoop"), x: jogVal("slide"), label: "Jog" };
+  const c = M.consts.find((x) => x.name === $("capSel").value);   // ghost = the capture target as it is now
+  if (c) { S.preview.ghost = ghostFor(c, S.preview.arm, S.preview.scoop, c.value); if (S.preview.ghost) S.preview.label = `Jog (ghost: ${c.name} now)`; }
+  jogInfo(); drawAt(S.t);
+}
+const jogSent = { arm: 0, scoop: 0 }, jogTimer = {};
+function jogSend(kind) {   // throttled so the robot follows the slider while you drag
+  if (!S.live || kind === "slide") return;
+  const go = () => { jogSent[kind] = performance.now(); liveSend((kind === "arm" ? "A " : "S ") + jogVal(kind).toFixed(1)); };
+  clearTimeout(jogTimer[kind]);
+  const wait = 100 - (performance.now() - jogSent[kind]);
+  if (wait <= 0) go(); else jogTimer[kind] = setTimeout(go, wait);
+}
+function onJog(kind, v) { syncJog(kind, v); jogShow(); jogSend(kind); }
+for (const k of Object.keys(JOG_IDS)) { $(JOG_IDS[k][0]).oninput = (e) => onJog(k, e.target.value); $(JOG_IDS[k][1]).onchange = (e) => onJog(k, e.target.value); }
+$("btnJogFromT").onclick = () => { const f = frameAt(S.t), p = S.preview; setJog(p ? p.arm : f.aC, p ? p.scoop : (f.sC ?? f.sO), p ? p.x : f.x); jogShow(); };
+$("capSel").onchange = () => { if (S.preview && S.preview.name === "__jog") jogShow(); };
+$("btnSendSlide").onclick = () => liveSend("o " + Math.round(jogVal("slide")) + " 300");
+function fillCaptureSel() {
+  const sel = $("capSel"), cur = sel.value;
+  const grp = (k, label) => { const n = namesOf(k); return n.length ? `<optgroup label="${label}">${n.map((x) => `<option value="${x}">${x}</option>`).join("")}</optgroup>` : ""; };
+  sel.innerHTML = grp("arm", "Arm angle (ARM slider)") + grp("scoop", "Scoop angle (SCOOP slider)") + grp("slide", "Slide position (SLIDES slider)");
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+}
+$("btnCapture").onclick = () => {
+  const c = M.consts.find((x) => x.name === $("capSel").value); if (!c) return;
+  const kind = groupKind(c.group), v = jogVal(kind), nv = kind === "slide" ? Math.round(v) : Math.round(v * 10) / 10, old = c.value;
+  c.value = nv; renderValues(); markDirty(); toast(`${c.name}: ${old} → ${nv}${kind === "slide" ? " mm" : "°"}`);
+};
+$("btnRunAll").onclick = () => { S.preview = null; liveSend("g"); };
+$("btnRunSel").onclick = () => { S.preview = null; liveSend("r " + Math.max(0, S.sel)); };
+$("btnStepMode").onclick = () => liveSend("t");
+$("btnNext").onclick = () => liveSend("n");
+$("btnStop").onclick = () => liveSend("x");
+$("speedSel").onchange = (e) => liveSend("k " + e.target.value);
+
+// ============================================================================
+// TABS / BOOT
+// ============================================================================
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[role=tab]"); if (!b) return;
+  document.querySelectorAll(".tabs button").forEach((x) => { const on = x === b; x.setAttribute("aria-selected", on); $(x.dataset.pane).hidden = !on; });
+});
+window.addEventListener("resize", () => drawTimeline());
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { T3.ok && T3.theme(); drawTimeline(); });
+new MutationObserver(() => { T3.ok && T3.theme(); drawTimeline(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+(async function boot() {
+  initTwin();
+  const snap = $("snap-seq").textContent, cfg = $("snap-cfg").textContent, date = $("snap-date").textContent.trim();
+  try { loadConfig(cfg); } catch (e) {}
+  try { loadSequence(snap, `built-in snapshot${date ? " · " + date : ""}`); } catch (e) { toast(e.message); }
+  afterLoad();
+  // offer to reopen the folder used last time (Chrome keeps the permission handle)
+  const dir = await idb("get", "dir");
+  if (dir && window.showDirectoryPicker) {
+    const b = $("btnOpenDir"); b.textContent = "Reopen " + dir.name; b.onclick = async () => { try { await openDir(dir); b.textContent = "Open robot folder"; b.onclick = async () => { try { await openDir(); } catch (e) { if (e.name !== "AbortError") toast(e.message); } }; } catch (e) { if (e.name !== "AbortError") toast(e.message); } };
+  }
+})();
+</script>
+</body>
+</html>

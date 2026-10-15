@@ -1,148 +1,94 @@
-# Robot Controller V2.1 (robot v2, servo intake)
+# Robot_Controller_V2_1
 
-Same state machine as `Robot_Controller_V2`, made non-blocking and fully wired:
+The competition program for the V2 robot (servo intake, goBILDA slide motor). It runs a **table of steps** from `Sequence.h`: V2's tested intake, V1's transfer (carry, pour, vibrate) and a profiled outtake that blends from fast into a slow creep so the bucket tips gently.
 
-```
-DOWN -> SCOOP -> PICKUP -> TRANSFER -> BEFORE_EXTEND -> OUTTAKE_EXTEND -> OUTTAKE_RETRACT -> DONE
-```
-
-Sketch folder files (all required):
-`Robot_Controller_V2_1.ino`, `MotorController.*`, `MotionProfile.*`, `PIDController.*`, `ServoAxis.*`
-Libraries: **Encoder** (Paul Stoffregen) and **Adafruit PWM Servo Driver** (installs Adafruit BusIO).
-Board: Arduino Nano (ATmega328P). Uses about 23.4 KB flash and 1.05 KB RAM.
-
-## What changed vs V2
-
-| Area | V2 | V2.1 |
+| File | What's in it | Who edits it |
 |---|---|---|
-| Compiles | No (outtake cases half-ported) | Yes |
-| Arm + scoop | Instant servo steps, `delay()` | `ServoAxis` on the v1 `MotionProfile` (accel/cruise/decel) |
-| SCOOP sweep | 2 s blocking loop | Same path, one profiled move, non-blocking |
-| Outtake | Never ran (BEFORE_EXTEND went to DONE) | Profile + PID + feedforward, closed loop on encoder D2/D3 |
-| Transfer | No vibration | v1 scoop vibration back (±50 µs, 50 ms toggle, ≥1 s) |
-| Visibility | One print every 100 ms | 50 Hz CSV telemetry + events, run summary, config dump |
-| Safety | None | Stall detect, wiring-direction check, no-motion check, I2C timeout, servo-board check, watchdog, `x` abort |
-| R25 end signal | Missing | LED on `END_LED_PIN` at DONE |
+| `Sequence.h` | **The state machine.** Named angles (degrees), slide positions (mm), speeds, and one row per step. | You, or `tools/sequence_editor.html` (saves straight to it) |
+| `RobotConfig.h` | Pins, slide gear ratio and spool, servo calibration, slide gains, safety limits. Must match `ROBOT_SPECS.md`. | Calibration results, spec changes |
+| `Robot_Controller_V2_1.ino` | The step runner, safety monitors, telemetry, serial console. No tuning numbers. | Code changes only |
+| `SequenceTypes.h` | The keywords used in `Sequence.h` (`HOLD`, `WAIT_MS` ...). | Nobody |
+| `MotionProfile`, `MotorController`, `ServoAxis`, `PIDController` | Trapezoid profiles (with blending), slide PID + feedforward, servo axes in degrees. | Code changes only |
 
-State timings are V2's, kept as **minimum** times. Each state also waits for its motion profile to finish. Lower the `*_MIN_MS` values to go faster.
+## The sequence
 
-`MotionProfile`, `MotorController` and `PIDController` only gained additive features (profile velocity getter, optional feedforward, open-loop mode, velocity estimate). With the new gains at 0 they behave like v1.
+| | Step | What happens | Ends when |
+|---|---|---|---|
+| Intake (V2) | `SCOOP_DOWN` | scoop jumps to `S_DOWN` | 500 ms |
+| | `ARM_DOWN` | arm jumps to `A_DOWN` | 500 ms |
+| | `SWEEP` | 2 s timed move: scoop `S_DOWN` → `S_SCOOP` while the arm goes `A_DOWN` → `A_PEAK` → `A_SCOOP` | done |
+| | `PICKUP` | scoop to `S_PICKUP` (lip up) | 1000 ms (V1 used 100) |
+| Transfer (V1) | `LIFT` | arm lifts to `A_TRANSFER` over 1 s, scoop still at pickup | 500 ms in |
+| | `CARRY` | scoop to the carry angle `S_CARRY` while the arm keeps lifting | arm 90% up |
+| | `POUR` | scoop tips to `S_POUR` over the bucket | done |
+| | `VIBRATE` | scoop shakes ±`VIBRATE_DEG` at 10 Hz | 1000 ms |
+| Outtake | `EXTEND` | arm to `A_MOVE` while the slides run at `SLIDE_FAST` to `X_CREEP` | reaches `X_CREEP` |
+| | `CREEP` | slides carry on at `SLIDE_CREEP` (no stop in between) so the bucket tips slowly | reaches `X_TIP` |
+| | `TIP_HOLD` | hold while the rocks fall | 300 ms |
+| | `RETRACT` | slides back to 0 at `SLIDE_MAX` | arrived |
 
-## Test workflow (USB tether)
+<table><tr>
+<td><img src="img/seq_SWEEP.png" width="230" alt="Twin: end of the sweep, scoop flat on the floor"><br>SWEEP</td>
+<td><img src="img/seq_PICKUP.png" width="230" alt="Twin: pickup, lip up"><br>PICKUP</td>
+<td><img src="img/seq_CARRY.png" width="230" alt="Twin: lift with the scoop at carry"><br>LIFT / CARRY</td>
+<td><img src="img/seq_POUR.png" width="230" alt="Twin: pour over the bucket"><br>POUR</td>
+</tr><tr>
+<td><img src="img/seq_ARM_DOWN.png" width="230" alt="Twin: arm down, scoop folded back"><br>ARM_DOWN</td>
+<td><img src="img/seq_VIBRATE.png" width="230" alt="Twin: vibrate"><br>VIBRATE</td>
+<td><img src="img/seq_CREEP.png" width="230" alt="Twin: slides creeping at the hopper"><br>CREEP (CAD slide numbers)</td>
+<td><img src="img/seq_RETRACT.png" width="230" alt="Twin: retract"><br>RETRACT</td>
+</tr></table>
 
-The Nano restarts every time you upload, plug in USB, or open the serial port (Serial Monitor or the capture script). With the default `WAIT_FOR_GO = false` the run starts on every restart, exactly like the power switch at competition.
+Pictures come from the twin with CAD estimates; the twin's angles are only exact after the servo calibration.
 
-**Bench mode (recommended while testing):** set `WAIT_FOR_GO = true` and upload.
-1. Battery ON.
-2. `python tools/capture_log.py` (needs `pip install pyserial`). The Nano resets, holds the start pose and blinks the end LED.
-3. Type `g` + Enter to start. `x` + Enter aborts.
-4. It stops 1 s after DONE and writes `logs/run_<time>.csv` plus `logs/run_<time>.html`. Double-click the HTML to see the run.
+**Rules for a row** (also in the comments of `Sequence.h`):
+- ARM / SCOOP: an angle name, a number, or `HOLD`. `HOLD` means "don't touch it": a move started in an earlier step keeps going. That is how steps overlap (the arm keeps lifting through `CARRY`, the arm clears during `EXTEND`).
+- MOVE: `INSTANT` (send the target, servo moves at its own speed, like V2), `PROFILED` (smooth, at `ARM_SPEED` / `SCOOP_SPEED`), or a time in ms (timed move; with `ARM VIA` the arm passes through that angle halfway).
+- SLIDE: mm from fully in, or `HOLD`. Two slide rows in a row that keep going the same way **blend**: the first slows to the second's speed instead of stopping.
+- NEXT WHEN: `WAIT_MS(ms)`, `WAIT_ARRIVED(ms)`, `WAIT_ARM(%)`, `WAIT_SLIDE(%)`.
 
-Set `WAIT_FOR_GO = false` again before competition. Every log header shows `wait_for_go=` so you can check.
+## Editing and tuning
 
-Close the Arduino Serial Monitor first. Only one program can own the COM port.
+1. Open `tools/sequence_editor.html` in Chrome or Edge → **Open robot folder** → pick this folder. Edit, watch the twin and the predicted run time, **Save** (Ctrl+S).
+2. Upload `Robot_Controller_V2_1.ino`.
+3. First runs on the robot: set `SPEED_PCT_AT_BOOT = 25` (slow motion) and/or `STEP_MODE_AT_BOOT = true` (pauses after every step, `n` = next), or use the console commands below.
+4. Log runs with `python tools/capture_log.py` and open the `.html` it writes.
 
-For the slides on their own, use `Slide_Test` (see its README).
+**Tune it in the editor first**, then confirm on the robot: see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). The Jog sliders pose the twin with no robot; Capture writes the pose into an angle or slide position.
 
-## First-time calibration (do in this order)
+**Live link** (check poses by eye on the real robot): upload with `RUN_MODE = RUN_CONSOLE`, close the serial monitor, battery on, editor → Jog & live link → Connect. The same sliders now move the robot. Capture, Save, re-upload.
 
-Set `RUN_MODE = RUN_CONSOLE`, upload, run `python tools/capture_log.py --keep-open`, then:
+## Test settings (top of the .ino)
 
-1. **Directions.** Type `j 100 300`. The slide must extend and `oP` must go up.
-   - Ticks go down: flip `OUTTAKE_ENCODER_DIRECTION`.
-   - Slide retracts: flip `OUTTAKE_MOTOR_DIRECTION`.
-   - The firmware cuts the motor with `DIR_MISMATCH` or `NO_MOTION` if this is wrong during a profiled move.
-2. **Extend target.** Retract fully and type `z` (zero). Jog out with `j 120 300` until the bucket has fully tipped on the hopper rim, then read `oP`. Put that number in `OUTTAKE_EXTEND_TICKS`. The default of 1000 is deliberately short.
-3. **Arm trim.** Use `a 940`, `a 500` etc. If either arm servo hums or gets warm at rest, adjust `ARM_R_TRIM_US` / `ARM_L_TRIM_US`.
-4. **Feedforward.** Run `o 3000 800`, `o 0 800`, `o 3000 1600`, `o 0 1600` (use a target inside your travel). Open the log and copy kS / kV / kG from the viewer's Feedforward fit panel. Then raise `OUTTAKE_KP` until tracking error is small without oscillation.
-5. Set `RUN_MODE = RUN_FULL` for competition.
-
-`RUN_OUTTAKE_ONLY` and `RUN_INTAKE_ONLY` run half the sequence for focused testing.
-
-## Servo angles in degrees
-
-goBILDA 300° servos give exact rates:
-- Scoop: 6.667 µs per degree.
-- Arm: 40T → 48T gears give 8.0 µs, which is exactly **5 position units, per arm degree**.
-
-| Constant | Default | Meaning |
+| Setting | Bench | Competition |
 |---|---|---|
-| `ARM_VERTICAL_POS` | 650 | arm position with the posts vertical |
-| `SCOOP_ZERO_US` | 2300 | scoop pulse in the start/CAD pose |
+| `RUN_MODE` | `RUN_CONSOLE` for jogging / live link | **`RUN_FULL`** |
+| `WAIT_FOR_GO` | `true` = wait for `g` after the USB reset | **`false`** |
+| `FIRST_STEP` / `LAST_STEP` | run part of the sequence (e.g. 0..7 = intake + transfer only) | **0 / 255** |
+| `STEP_MODE_AT_BOOT` | `true` = pause after each step | **`false`** |
+| `SPEED_PCT_AT_BOOT` | 25 or 50 for first tries | **100** |
 
-Both zeros were solved from the CAD. With them, the scoop just touches the floor at A_DOWN, and the start pose fits the cube. The current positions come out as round numbers:
+## Serial console (115200)
 
-| Arm | Angle (forward of vertical) |
-|---|---|
-| A_START | −58° |
-| A_TRANSFER | −54° |
-| A_MOVE | 30° |
-| A_PEAK | 60° |
-| A_DOWN | 90° |
-| A_SCOOP | 100° |
+`x` stop · `g` run · `r <n>` run from step n · `t` step mode on/off · `n` next step · `k <pct>` speed % · `l` list steps · `p` config ·
+`A <deg>` arm · `S <deg>` scoop · `Q` pose · `o <mm> [mm/s]` slide move · `j <pwm> <ms>` slide jog · `z` zero slide · `c` coast · `v` vibrate
 
-| Scoop | Angle (from start pose) |
-|---|---|
-| S_PICKUP | −30° |
-| S_SCOOP | −60° |
-| S_TRANSFER | −75° |
-| S_PEAK | −180° |
-| S_DOWN | −240° |
+Jog commands work in `RUN_CONSOLE`, or while `WAIT_FOR_GO` is waiting. During a run only `x`, `t` and `n` are accepted.
 
-Calibrate in RUN_CONSOLE:
-- `A 0` should stand the posts vertical; check with a phone level. If not, nudge `ARM_VERTICAL_POS`.
-- `S 0` is the start pose.
+## Safety and events
 
-Positions can be written as `ARM_POS_FROM_DEG(90)` / `SCOOP_US_FROM_DEG(-75)`. The existing values are unchanged. The twin reads these constants from each log, so calibrating the firmware calibrates the twin.
+- **Slide stall** (pushing ≥ 90 PWM, slower than 50 counts/s for 200 ms) or **timeout** (profile time + 1.5 s): runs the `RETRACT` step once, then stops. Events `STALL`, `TIMEOUT`, `FALLBACK`.
+- **Wiring check**: driving one way but running away fast the other → motor off, `DIR_MISMATCH`.
+- `SETTLED_SHORT`: the slide stopped close to (but not at) its target and the step moved on. Tune `SLIDE_KG` / `SLIDE_KS`.
+- 60 s watchdog, I2C timeout recovery, `NO_SERVO_DRIVER` (won't run the slides with no servo board).
+- DONE: motor off, servos hold, LED on.
 
-## Where the time goes (default config, simulated)
+## Changing the slide gear ratio
 
-| State | s | What sets it |
-|---|---|---|
-| DOWN | 1.42 | arm waits for the scoop profile (0.73 s), then the arm profile (0.68 s). V2 started the arm at a fixed 500 ms |
-| SCOOP | 2.00 | `SCOOP_SWEEP_MS` |
-| PICKUP | 1.00 | `PICKUP_MIN_MS` (the scoop move itself takes 0.23 s) |
-| TRANSFER | 2.00 | `TRANSFER_MIN_MS`, vibration ≥ `VIBRATE_MIN_MS` |
-| BEFORE_EXTEND | 1.00 | `BEFORE_EXTEND_MIN_MS` (the arm move takes 0.5 s) |
-| OUTTAKE_EXTEND | ~4.1 | profile (~2.6 s) + `OUTTAKE_DUMP_MS` (1.5 s) |
-| OUTTAKE_RETRACT | ~2.6 | profile |
+Edit `SLIDE_STEP_UP` in `RobotConfig.h` (and the spec in `ROBOT_SPECS.md`). Slide positions and speeds are in mm, so `Sequence.h` doesn't change. Gains are in motor encoder counts, so `KS`/`KV` stay valid; re-check `KG`/`KA` with `calibration/Slide_PID_Tune`. The editor shows the new free speed; keep `SLIDE_FAST`/`SLIDE_MAX` under about 80% of it.
 
-Total about 14.1 s (boot to DONE). These figures come from the software-in-the-loop sim (`tools/sil_sim`), not a real run. Replace them with your own logs.
+## Telemetry
 
-### Speed-ups, biggest first (each is a constant at the top of the sketch)
+Same `D` columns as before so `tools/run_viewer.html` still works: arm logged as 0–1000 (650 = vertical, 5 per degree), scoop as µs-equivalent (2300 = 0°, 6.667 per degree), slides in encoder counts. `#STATES` carries the step names, `S` lines mark each step, `#CFG` lists calibration and gains.
 
-1. `OUTTAKE_DUMP_MS` 1500. Film a dump at 240 fps and set it to the time the last rock takes to clear the bucket, plus about 150 ms.
-2. `TRANSFER_MIN_MS`, `PICKUP_MIN_MS`, `BEFORE_EXTEND_MIN_MS`. These are V2's fixed waits. The moves themselves finish well before them (0.9 s, 0.23 s, 0.5 s). Set them to 0 and keep `VIBRATE_MIN_MS` as the real transfer time.
-3. The slide's `OUTTAKE_*_MAX_VEL`. Raise it until the log shows PWM saturating at 250 during cruise.
-4. `SCOOP_MAX_VEL` if the scoop servo is a speed variant. DOWN waits for it.
-5. Check boot delay. If you have to select "ATmega328P (Old Bootloader)" to upload, the board's old bootloader may wait up to ~1 s after power-on before `setup()` runs. Optiboot skips that wait on power-up. Measure switch-flip to first servo move with phone slow-mo before deciding to re-flash (needs an ISP, e.g. another Arduino).
-
-With the first two applied, the sim's "faster" example run takes 12.0 s instead of 14.1 s.
-
-## Telemetry format
-
-```
-D,t,st,ph,aT,aC,sT,sC,sO,oT,oS,oP,oV,oPWM,oFF,fl,lm   every 20 ms
-S,t,STATE,index                                        state change
-E,t,CODE,value                                         event, see below
-R,t,run_ms                                             run finished
-#...                                                   header / config (config printed after DONE)
-```
-
-Column meanings are documented above `logTelemetry()` in the sketch.
-
-| Event | Meaning |
-|---|---|
-| `ARRIVED` | Slide reached its target (±25 ticks) |
-| `SETTLED_SHORT` | Slide stopped within 150 ticks of target and the run moved on. Tune kG / kS. |
-| `STALL` | Pushing ≥90 PWM but not moving (bucket jammed or end stop). Run treats it as arrived. |
-| `TIMEOUT` | Move took longer than its profile + 1.5 s |
-| `NO_MOTION` | Stalled without the encoder moving. Motor reversed, unpowered, or encoder unplugged. Run aborts. |
-| `DIR_MISMATCH` | Pushing one way, running away the other. Motor or encoder direction flipped. Run aborts. |
-| `STALL_CUT` | Console move stalled, motor cut |
-| `I2C_TIMEOUT` | Servo-board bus glitch, bus was reset |
-| `NO_SERVO_DRIVER` | PCA9685 not found at boot, run refused |
-| `WATCHDOG` | Run exceeded 60 s and was stopped |
-| `VIB_ON` / `VIB_OFF` | Transfer vibration start/stop (value = amplitude / duration) |
-
-**Power note:** if the Nano browns out and resets when the motor starts, it restarts the run and re-zeros the encoder wherever the slide is. Give the Nano its own regulator, or decouple it from the motor supply.
+Flash 28.0 KB of 30 KB, RAM 1.16 KB of 2 KB (no Adafruit servo library: a 30-line PCA9685 driver with the same 50 Hz setup).
