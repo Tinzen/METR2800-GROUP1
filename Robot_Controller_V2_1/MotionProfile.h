@@ -5,28 +5,29 @@
 
 // Trapezoidal / triangular motion profile.
 //
-// Identical behaviour to the v1 class. V2.1 only adds read-only getters for
-// the profile's velocity and acceleration at the last update(). These are used
-// for motor feedforward (kV, kA) and for telemetry.
+// moveTo() behaves exactly like the v1 class (starts and ends at rest).
+// moveToVel() can also start and/or end moving, which lets two moves blend
+// without stopping in between (slides: fast cruise -> slow creep).
 class MotionProfile {
   public:
     MotionProfile();
 
-    // Units are whatever the owner uses: servo units, microseconds,
-    // encoder ticks, etc.
+    // Units are whatever the owner uses (degrees, encoder ticks, ...).
     void setLimits(float maxVelocity, float maxAcceleration);
 
     float getTarget() const;
     float getCurrent() const;
 
     void moveTo(float startPosition, float targetPosition);
+    // startVel / endVel are speeds (>= 0) in the direction of travel.
+    void moveToVel(float startPosition, float targetPosition, float startVel, float endVel);
     float update();
     bool isFinished() const;
 
-    // ---- V2.1 additions (read-only, do not change v1 behaviour) ----
     float getVelocity() const;      // signed units/s at last update()
     float getAcceleration() const;  // signed units/s^2 at last update()
     float getTotalTime() const;     // seconds for the current move
+    float getProgress() const;      // 0..1 of distance at last update()
     float getMaxVelocity() const;
     float getMaxAcceleration() const;
 
@@ -41,20 +42,23 @@ class MotionProfile {
     unsigned long startTimeMs;
 
     float totalDist;
-    float accelDist;
-    float cruiseDist;
+    float v0;          // entry speed
+    float v1;          // exit speed
     float vPeak;
-    float accelTime;
-    float cruiseTime;
+    float acc1;        // signed accel of phase 1 (+ speeds up, - slows down)
+    float dec3;        // decel magnitude of phase 3
+    float d1, d2;      // distance of phase 1 and 2 (cruise)
+    float t1, t2, t3;
     float totalTime;
 
     bool done;
 
-    float currentVel;   // V2.1
-    float currentAcc;   // V2.1
+    float currentVel;
+    float currentAcc;
+    float progress;
 
-    float computeDistance(unsigned long nowMs) const;
-    void computeRates(float elapsedSec);  // V2.1
+    void plan();
+    void sample(float elapsed, float& dist, float& vel, float& acc) const;
 };
 
 #endif

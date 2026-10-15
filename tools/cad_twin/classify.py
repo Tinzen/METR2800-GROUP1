@@ -18,9 +18,14 @@ for i in range(len(M)):
     if i in bucket_ids: g='bucket'
     elif i in out_ids:
         q=c-C0; a,b,d=q@AX,q@N2,q@N3
-        if abs(d)<=35 and abs(a)<=230 and -52<=b<=50:
+        nml=(M[i]['name'] or '').lower()
+        is_motor=any(k in nml for k in ('5000-','5103','3422','motor','encoder','gearbox'))
+        # rails sit on the stack centreline (n3=0), wheels/shims/nuts at n3=-16.5;
+        # the motor + gearbox sit on the other side (n3 +15..+40) and must stay fixed
+        if is_motor or d > 12: g='base'
+        elif d>=-30 and abs(a)<=192 and -52<=b<=50:   # within the 400 mm rail span; end brackets stay fixed
             g='stage%d'%int(np.clip(round((40-b)/10),0,8))
-        elif b< -52 and abs(a)<=230 and abs(d)<=60: g='stage8'
+        elif b< -52 and abs(a)<=230 and -60<=d<=12: g='stage8'
         else: g='base'
     elif i in SCOOP_IDS or (owner.get(i,'').startswith('new intake') and M[i]['name'] in SCOOP_NAMES and lo[2]>330): g='scoop'
     elif lo[2]>=104 and lo[1]>=-45 and hi[1]<=45 and lo[0]>=-352 and hi[0]<=15: g='arm'

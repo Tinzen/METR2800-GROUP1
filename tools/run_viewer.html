@@ -208,6 +208,8 @@ kbd { font-family: var(--f-data); font-size: 11px; border: 1px solid var(--line)
         <label for="viewSel">View</label>
         <select id="viewSel"><option value="track">Whole track</option><option value="robot">Robot close-up</option></select>
         <span class="hint"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step</span>
+        <span class="hint">3D: scroll zooms at the cursor · middle-drag pans · Shift + middle-drag orbits · double-click fits (trackpad: drag orbits, Shift + drag pans)</span>
+        <label class="hint"><input id="revZoom3d" type="checkbox"> Reverse zoom</label>
       </div>
       <div class="legend" id="twinLegend">
         <span><i style="background:var(--s2)"></i>Slide actual (encoder)</span>
@@ -1069,15 +1071,15 @@ const FIELD_X0 = 35, FIELD_Y0 = 439;                 // field (xf, yf) -> robot 
 const HOPPER = { xf: 2102.5, yf: 900, rim: 732, r: 55 };
 // goBILDA 300° servos: arm 5 units/° (40T:48T gears), scoop 6.667 µs/°. Zeros estimated from the CAD.
 // Logs from firmware with ARM_VERTICAL_POS / SCOOP_ZERO_US in #CFG override these.
-const TW_DEFAULT = { armVerticalPos: 650, armUnitsPerDeg: 5, scoopZeroUs: 2300, scoopUsPerDeg: 6.667, scoopSign: -1, mmPerTick: 0, slideTiltDeg: 14.9 };
+const TW_DEFAULT = { armVerticalPos: 650, armUnitsPerDeg: 5, scoopZeroUs: 2300, scoopUsPerDeg: 6.667, scoopSign: 1, mmPerTick: 0, slideTiltDeg: 14.9 };
 const TW_FIELDS = [
   ["armVerticalPos", "Arm position with posts vertical"], ["armUnitsPerDeg", "Arm units per degree"],
   ["scoopZeroUs", "Scoop pulse at CAD pose (µs)"], ["scoopUsPerDeg", "Scoop µs per degree"], ["scoopSign", "Scoop direction in model (±1)"],
   ["mmPerTick", "Slide mm per tick (0 = auto)"], ["slideTiltDeg", "Slide tilt down from CAD 32° (°)"]
 ];
 let TW = loadTw();
-function loadTw() { try { const s = JSON.parse(localStorage.getItem("dover-twin3d") || "null"); if (s) return Object.assign({}, TW_DEFAULT, s); } catch (e) {} return Object.assign({}, TW_DEFAULT); }
-function saveTw() { try { localStorage.setItem("dover-twin3d", JSON.stringify(TW)); } catch (e) {} }
+function loadTw() { try { const s = JSON.parse(localStorage.getItem("dover-twin3d-v2") || "null"); if (s) return Object.assign({}, TW_DEFAULT, s); } catch (e) {} return Object.assign({}, TW_DEFAULT); }
+function saveTw() { try { localStorage.setItem("dover-twin3d-v2", JSON.stringify(TW)); } catch (e) {} }
 const T3 = { ok: false };
 const DEG = Math.PI / 180;
 
@@ -1120,7 +1122,7 @@ function initTwin3D() {
 
   // robot
   const robot = new THREE.Group(); scene.add(robot);
-  robot.add(bodyGroup("base"));
+  const baseBody = bodyGroup("base"); robot.add(baseBody);
   const armPivot = new THREE.Group(); armPivot.position.copy(PA); robot.add(armPivot);
   armPivot.add(bodyGroup("arm"));
   const scoopPivot = new THREE.Group(); scoopPivot.position.copy(PS).sub(PA); armPivot.add(scoopPivot);
@@ -1180,36 +1182,88 @@ function initTwin3D() {
   const rc = R(1805 - rampRun / 2, 1000, rampRise / 2 + 9); ramp.position.copy(rc);
   ramp.rotation.y = Math.atan2(rampRise, rampRun); field.add(ramp);   // robot -x is field +x, so +y rotation lifts the far end
 
-  // camera control (orbit about target, Z up)
-  const cam = { target: new THREE.Vector3(), r: 1500, az: 0, el: 0.4 };
+  // camera: Fusion 360 / Inventor style (same as tools/sequence_editor.html)
+  //   wheel = zoom at the cursor, middle-drag = pan, Shift + middle-drag = orbit about the point
+  //   under the cursor, double-click (middle or left) = fit. Left-drag orbits / Shift+left pans (trackpads).
   const PRESETS = {
     robot: { target: [-165, -170, 170], r: 1350, az: 0.95, el: 0.38 },
     track: { target: [-1050, -260, 280], r: 3900, az: 0.62, el: 0.52 }
   };
-  const setPreset = (k) => { const p = PRESETS[k] || PRESETS.robot; cam.target.set(...p.target); cam.r = p.r; cam.az = p.az; cam.el = p.el; place(); };
-  const place = () => {
-    const ce = Math.cos(cam.el);
-    camera.position.set(cam.target.x + cam.r * ce * Math.cos(cam.az), cam.target.y + cam.r * ce * Math.sin(cam.az), cam.target.z + cam.r * Math.sin(cam.el));
-    camera.lookAt(cam.target); request();
-  };
-  let drag = null;
-  canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
+  const tgt = new THREE.Vector3(), ZUP = new THREE.Vector3(0, 0, 1);
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const pickables = [baseBody, armPivot, slideRoot, field];
+  const place = () => { if (camera.position.distanceTo(tgt) < 30) tgt.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 30); camera.lookAt(tgt); request(); };
+  const setCam = (t, r, az, el) => { tgt.set(...t); const ce = Math.cos(el); camera.position.set(tgt.x + r * ce * Math.cos(az), tgt.y + r * ce * Math.sin(az), tgt.z + r * Math.sin(el)); place(); };
+  const setPreset = (k) => { const p = PRESETS[k] || PRESETS.robot; setCam(p.target, p.r, p.az, p.el); };
+  function pickAt(cx, cy) {   // world point under the cursor: the model if hit, else on the focus plane
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(pickables, true).find((x) => x.object.isMesh);
+    if (hit) return { p: hit.point.clone(), hit: true };
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), tgt), q = new THREE.Vector3();
+    return { p: ray.ray.intersectPlane(plane, q) ? q : tgt.clone(), hit: false };
+  }
+  function fit() {
+    robot.updateMatrixWorld(true);
+    const box = new THREE.Box3(); for (const o of [baseBody, armPivot, slideRoot]) box.expandByObject(o);
+    const sph = box.getBoundingSphere(new THREE.Sphere()), fwd = camera.getWorldDirection(new THREE.Vector3());
+    const vf = camera.fov * DEG, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+    const d = sph.radius / Math.sin(Math.min(vf, hf) / 2) * 1.05;
+    tgt.copy(sph.center); camera.position.copy(sph.center).addScaledVector(fwd, -d); place();
+  }
+  let zoomPt = null, zoomAt = 0, zoomXY = [0, 0];
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const now = performance.now();
+    if (!zoomPt || now - zoomAt > 250 || Math.hypot(e.clientX - zoomXY[0], e.clientY - zoomXY[1]) > 4) zoomPt = pickAt(e.clientX, e.clientY).p;
+    zoomAt = now; zoomXY = [e.clientX, e.clientY];
+    let dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    if (TW.revZoom) dy = -dy;
+    let s = Math.exp(Math.max(-250, Math.min(250, dy)) * (e.ctrlKey ? 0.01 : 0.0015));   // > 1 = out
+    const d = camera.position.distanceTo(zoomPt);
+    if (d * s < 40) s = 40 / d; if (d * s > 15000) s = 15000 / d;
+    camera.position.sub(zoomPt).multiplyScalar(s).add(zoomPt); tgt.sub(zoomPt).multiplyScalar(s).add(zoomPt);
+    place();
+  }, { passive: false });
+  let drag = null, lastMid = 0, lastMidXY = [0, 0];
+  canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });   // no middle-click autoscroll
+  canvas.addEventListener("auxclick", (e) => e.preventDefault());
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button === 1) {   // double-click the middle button = fit (Fusion / Inventor)
+      const now = performance.now();
+      if (now - lastMid < 400 && Math.hypot(e.clientX - lastMidXY[0], e.clientY - lastMidXY[1]) < 6) { lastMid = 0; fit(); return; }
+      lastMid = now; lastMidXY = [e.clientX, e.clientY];
+    }
+    const mode = e.button === 1 ? (e.shiftKey ? "orbit" : "pan") : e.button === 0 ? (e.shiftKey ? "pan" : "orbit") : e.button === 2 ? "pan" : null;
+    if (!mode) return;
+    const pk = pickAt(e.clientX, e.clientY);
+    drag = { x: e.clientX, y: e.clientY, mode, pivot: pk.hit ? pk.p : tgt.clone(), depth: camera.getWorldDirection(new THREE.Vector3()).dot(pk.p.clone().sub(camera.position)) };
+    canvas.setPointerCapture(e.pointerId); canvas.style.cursor = mode === "pan" ? "move" : "grabbing";
+  });
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
-    if (drag.pan) {
-      const k = cam.r / canvas.clientHeight * 0.9;
-      const right = new THREE.Vector3(-Math.sin(cam.az), Math.cos(cam.az), 0);
-      const up = new THREE.Vector3().crossVectors(right, camera.getWorldDirection(new THREE.Vector3())).normalize();
-      cam.target.addScaledVector(right, -dx * k).addScaledVector(up, -dy * k);
-    } else { cam.az -= dx * 0.008; cam.el = Math.max(-0.2, Math.min(1.5, cam.el + dy * 0.006)); }
+    if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.mode === "pan") {   // the grabbed point stays under the cursor
+      const wpp = 2 * Math.max(20, drag.depth) * Math.tan(camera.fov * DEG / 2) / canvas.clientHeight;
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      const mv = right.multiplyScalar(-dx * wpp).add(up.multiplyScalar(dy * wpp));
+      camera.position.add(mv); tgt.add(mv);
+    } else {                     // turntable orbit about the pivot, Z stays up
+      const C = drag.pivot, fwd = tgt.clone().sub(camera.position).normalize();
+      const el = -Math.asin(Math.max(-1, Math.min(1, fwd.z)));
+      const el2 = Math.max(-88 * DEG, Math.min(88 * DEG, el + dy * 0.006));
+      const right = new THREE.Vector3().crossVectors(fwd, ZUP).normalize();
+      const q = new THREE.Quaternion().setFromAxisAngle(ZUP, -dx * 0.008).multiply(new THREE.Quaternion().setFromAxisAngle(right, -(el2 - el)));
+      camera.position.sub(C).applyQuaternion(q).add(C); tgt.sub(C).applyQuaternion(q).add(C);
+    }
     place();
   });
-  const endDrag = () => { drag = null; };
+  const endDrag = () => { drag = null; canvas.style.cursor = ""; };
   canvas.addEventListener("pointerup", endDrag); canvas.addEventListener("pointercancel", endDrag);
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-  canvas.addEventListener("wheel", (e) => { e.preventDefault(); cam.r = Math.max(300, Math.min(9000, cam.r * Math.exp(e.deltaY * 0.0012))); place(); }, { passive: false });
-  canvas.addEventListener("dblclick", () => setPreset($("viewSel").value));
+  canvas.addEventListener("dblclick", fit);
+  const rz = document.getElementById("revZoom3d");
+  if (rz) { rz.checked = !!TW.revZoom; rz.onchange = () => { TW.revZoom = rz.checked; saveTw(); }; }
 
   let pending = false;
   function request() { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; resize(); renderer.render(scene, camera); }); }
@@ -1265,7 +1319,7 @@ function initTwin3D() {
     return { mmpt, ext, auto: !(TW.mmPerTick > 0 || cfg.OUTTAKE_MM_PER_TICK > 0), sc,
              armDeg: (armV - v("aC")) / upd, scoopDeg: (v("sO") - sz) / spd, fromLog: cfg.ARM_VERTICAL_POS !== undefined };
   }
-  Object.assign(T3, { ok: true, update, setPreset, theme, request });
+  Object.assign(T3, { ok: true, update, setPreset, setCam, fit, theme, request });
   setPreset("robot"); theme();
   return true;
 }

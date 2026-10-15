@@ -21,6 +21,6 @@ Joint data the viewer uses (all in the CAD frame, mm, Z up):
 
 CAD envelope (not the real robot):
 - Height 401.3 mm (bucket top).
-- Footprint 393 × 442 mm, because the `other foot` rod reaches y = −405.
+- Footprint 393 × 370 mm (`export_model.py` drops the stray `other foot` standoff).
 
-Both exceed the 400 mm start-cube gauge (+0/−1 mm, R14). Measure the real robot.
+The height exceeds the 400 mm start-cube gauge (+0/−1 mm, R14). Measure the real robot.

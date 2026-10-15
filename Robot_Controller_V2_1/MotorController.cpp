@@ -5,35 +5,22 @@
 // Low-pass factor for the velocity estimate (0..1). Higher = less smoothing.
 static const float VELOCITY_FILTER_ALPHA = 0.35f;
 
+// Instances are globals (zero-filled at boot), so only non-zero members are
+// set here. Keeps flash small on the Nano.
 MotorController::MotorController(int ma, int mb, int mp, int encA, int encB)
 : MA(ma),
   MB(mb),
   MP(mp),
   encoder(encA, encB),
   pid(0.0f, 0.0f, 0.0f),
-  profile(),
   unitMode(DEGREES),
   ticksPerUnit(1.0f),       // 360 ticks/rev default: 1 tick = 1 degree
   encoderDirection(1),
   motorDirection(1),
-  target(0.0f),
-  movingTarget(0.0f),
   maxCommandPwm(255),
-  motorPower(0),
-  commandPower(0),
-  lastTime(0),
   interval(10),
   mode(ACTIVE),
-  tolerance(1.0f),
-  ffS(0.0f),
-  ffV(0.0f),
-  ffA(0.0f),
-  ffG(0.0f),
-  lastFeedforward(0),
-  lastPosition(0.0f),
-  velocity(0.0f),
-  openLoopPwm(0),
-  useMotionProfile(false)
+  tolerance(1.0f)
 {
 }
 
@@ -142,6 +129,18 @@ void MotorController::setTarget(float targetPosition, int maxPwm) {
 }
 
 
+void MotorController::setTargetBlend(float targetPosition, int maxPwm, float startVel, float endVel) {
+  target = targetPosition;
+  maxCommandPwm = constrain(abs(maxPwm), 0, 255);
+  pid.setOutputLimits(-maxCommandPwm, maxCommandPwm);
+  mode = ACTIVE;
+  // keep the integrator when blending out of a moving segment
+  if (startVel <= 0.0f) pid.reset();
+  movingTarget = getPosition();
+  useMotionProfile = true;
+  profile.moveToVel(movingTarget, target, startVel, endVel);
+}
+
 void MotorController::setTargetPID(float targetPosition, int maxPwm) {
   const int requestedPwm = constrain(abs(maxPwm), 0, 255);
 
@@ -224,6 +223,10 @@ bool MotorController::isProfileFinished() const {
 
 float MotorController::getProfileTotalTime() const {
   return profile.getTotalTime();
+}
+
+float MotorController::getProfileProgress() const {
+  return profile.getProgress();
 }
 
 MotorController::UnitMode MotorController::getUnitMode() const {

@@ -1,70 +1,103 @@
-# Notes for agents / teammates
+# AGENTS.md: read this first
 
-Read this before changing anything in the outtake or slide code.
+This is the entry point for every agent (Claude, Codex, teammates' tools) and every person working in this repo. Keep it short. Robot numbers go in **`ROBOT_SPECS.md`**, not here.
 
-## Outtake slide drivetrain
+## Rules
 
-- Motor: goBILDA 5203 Yellow Jacket, **435 rpm** (13.7:1 gearbox).
-- Encoder: **384.5 counts per gearbox output rev** (quadrature, as read by the `Encoder` library). It is on the motor, before the step-up.
-- **1.8:1 step-up** from the motor output to the slide spool, so the spool turns faster than the motor.
-  - Spool speed: 435 x 1.8 = about **783 rpm** with no load.
-  - Counts per spool rev: 384.5 / 1.8 = about **213.6**.
-  - Max encoder rate with no load: 435 / 60 x 384.5 = about **2790 counts/s**. A profile `maxVel` above about 80% of this (about 2200) will saturate the PWM under load.
-- Spool diameter: **36.15 mm**, so 113.57 mm of cable per spool rev.
-- **mm per encoder count = pi x 36.15 / 213.6 = 0.5317 mm** (1 mm = 1.881 counts). **Stringing is 1:1** (confirmed by Tinzen): 1 mm of string reeled in = 1 mm of slide travel, so this conversion applies directly to the slide.
-- Max slide speed with no load: 435 x 1.8 = 783 rpm at the spool, x 113.57 mm/rev = **about 1480 mm/s** (at 12 V; more on a full 4S battery at PWM 255). Under load, the usable speed is about 1100-1200 mm/s.
-- Motor stall torque is about 18.7 kg·cm (1.83 N·m) at 12 V. Through the 1.8:1 step-up that's 1.02 N·m at the spool, or **about 56 N of string pull at stall**. Max acceleration = 56 N / moving mass (unmeasured), minus friction.
-- **Encoder direction:** the raw count goes **negative when the slides extend**, so `OUTTAKE_ENCODER_DIRECTION = -1` (set in `Slide_Test`, tested 14 Oct 2026). `Robot_Controller_V2_1` still has `+1` and needs the same flip.
-- Motor direction (`OUTTAKE_MOTOR_DIRECTION = 1` in `Slide_Test`) has not been confirmed yet. Check that `j 100 300` extends the slide (with pins 8/9/11).
+1. **`ROBOT_SPECS.md` is the source of truth for robot numbers** (pins, ratios, spool, mm/count, directions, servo calibration, geometry). In V2.1 code they live in `Robot_Controller_V2_1/RobotConfig.h`. When a measurement changes:
+   - update `ROBOT_SPECS.md` first;
+   - then update the constants named in its **Code** column;
+   - then add a line to the change log below.
+2. **Quick spec check, only for the file you are editing.** Before you upload or commit a change to a sketch, run one grep and compare against ROBOT_SPECS.md §1 (pins), §3 (slides) and §4 (servos):
+   ```
+   grep -nE "OUTTAKE_(MA|MB|PWM|ENC_A|ENC_B)|SLIDE_(ENCODER_DIR|MOTOR_DIR|STEP_UP|SPOOL_DIA_MM|COUNTS_PER_MOTOR_REV)|ENCODER_DIRECTION|MOTOR_DIRECTION|MM_PER_(TICK|COUNT)|_CAL_US|_CAL_DEG|US_PER_DEG|MOTOR_(A|B|PWM) *=" <file>
+   ```
+   - Don't audit other sketches or re-derive numbers already in the spec file.
+   - If a file you are **not** editing is wrong, add it to "Known mismatches" instead of fixing it.
+3. **Others edit this repo at the same time.** Re-read a file right before you edit it. Edit in place; never paste a whole file from memory. Don't overwrite files you didn't change.
+4. **The Nano is tight: 30 KB flash, 2 KB RAM.** V2.1 is at 28.0 KB / 1.16 KB. Keep strings in `F()`, no new libraries, check the size after every change.
+5. **Don't change tuned values unless asked**: servo poses, gains, Tinzen's choices (Slide_Test has no travel limit on purpose).
+6. **V2.1 owns its classes.** `MotionProfile`, `ServoAxis`, `MotorController` in `Robot_Controller_V2_1/` are newer than the copies in `calibration/`. Don't copy between them; each sketch keeps its own.
+7. **Sequence sync: whichever was edited last wins.** The sequence is `Robot_Controller_V2_1/Sequence.h`. `tools/sequence_editor.html` opens and saves that same file (Chrome / Edge, "Open robot folder"). Keep them in step:
+   - **`Sequence.h` or `RobotConfig.h` edited by hand or by an agent** → refresh the editor's built-in snapshot (what it shows before a folder is opened), with this one-off from the repo root:
+     ```
+     python3 -c "import re,datetime;p='tools/sequence_editor.html';h=open(p,encoding='utf-8').read();[h:=re.sub(r'(<script type=\"text/plain\" id=\"%s\">).*?(</script>)'%t,lambda m,x=open(f,encoding='utf-8').read():m.group(1)+x+m.group(2),h,flags=re.S) for t,f in (('snap-seq','Robot_Controller_V2_1/Sequence.h'),('snap-cfg','Robot_Controller_V2_1/RobotConfig.h'))];h=re.sub(r'(id=\"snap-date\">).*?(</script>)',lambda m:m.group(1)+datetime.date.today().strftime('%d %b %Y')+m.group(2),h,flags=re.S);open(p,'w',encoding='utf-8').write(h)"
+     ```
+   - **Editor used without the folder** (Download / Copy) → the user gives you that text: write it to `Sequence.h`, then refresh the snapshot.
+   - Keep the format the editor parses: `// ---- SECTION ----` headers, `const float NAME = value;  // note` lines, table rows `{ "NAME", arm, scoop, slide, mm/s, move, via, vibrate, WAIT_x(n) },  // note`. New angle names go in the ARM ANGLES / SCOOP ANGLES sections.
+   - Step semantics live in the firmware's step runner and in the editor's `simulate()`. Change both together.
+8. **Log every change** that affects behaviour, specs, pins or workflow: one dated line in the change log below.
 
-## Units
+## Workflows
 
-- Internally all outtake positions are **encoder counts at the motor**, counted from wherever `z` (zero) was last pressed.
-- `Slide_Test` serial commands take **mm** (`m`, `mr`, `ext`, `vel`, `acc`) and convert with `MM_PER_TICK`. The `p` paste output stays in counts, because `Robot_Controller_V2_1` uses counts.
-- `Slide_Test` has **no travel limit** (Tinzen removed it on purpose, 14 Oct 2026). Only targets below 0 are clamped. The stall cut-out is the only end-of-travel protection. The `ext` default of 250 mm is a placeholder.
+**Slide gear ratio changes** (Tinzen may just say "step-up is now X:1"):
+1. `ROBOT_SPECS.md` §3: step-up, counts per spool rev, mm per count, free speed, stall pull.
+2. `RobotConfig.h`: `SLIDE_STEP_UP` only (mm/count and free speed are computed from it).
+3. Calibration sketches: the `MM_PER_TICK` / `MM_PER_COUNT` lines in `calibration/Slide_Encoder_Check`, `Slide_Test`, `Slide_PID_Tune`.
+4. `Sequence.h` does **not** change (mm and mm/s). Gains are in motor counts, so only `SLIDE_KG` / `SLIDE_KA` need a re-check on the robot; say so.
+5. If the new free speed × 0.8 is below `SLIDE_FAST` or `SLIDE_MAX` in `Sequence.h`, tell the user.
+6. Refresh the editor snapshot (rule 7), compile V2.1, log it.
 
-## Test sketches
+**Servo calibration results arrive** (three µs numbers from `Servo_Offset_Cal`): best done in the editor's Calibration tab ("Keep the robot's motion"). By hand: compute each named angle's pulse widths with the old `*_CAL_US`, set the new `*_CAL_US`, then solve each angle back from the same pulse widths (arm: average of the R and L results), write both files, refresh the snapshot.
 
-- `Slide_Encoder_Check/`: about 80 lines. Prints mm and counts. `+` / `-` pulse the motor. Uses the raw count, so extending reads negative. `MM_PER_COUNT = 0.5317`.
-- `Slide_Test/`: smooth moves in mm (`m 150`), gain tuning over serial, and 50 Hz logging for `tools/capture_log.py`. See its README for the workflow.
-- `Slide_PID_Tune/`: separate tuning sketch. `b <a> <b> [n]` bounce test (profiled) and `step <mm>` (pure PID) print per-move and average scores (peak lag, overshoot, settle, final error). Live gains; `g` prints paste-ready V2_1 lines. Same pins, units and D-line format as `Slide_Test`.
+## Repo map
 
-**Confirmed working pins (14 Oct 2026):** outtake motor **MA=8, MB=9, PWM=11**; encoder **A=2, B=3** (interrupt pins). These match the original `Robot_Controller` (V1) outtake pins, not the schematic. See "Electrical" below.
+| Path | What it is |
+|---|---|
+| `ROBOT_SPECS.md` | All robot numbers, with status (confirmed / calc / CAD / TODO) and the constants that use them. |
+| `Robot_Controller_V2_1/` | **The competition program.** `Sequence.h` = the state machine (one row per step), `RobotConfig.h` = hardware numbers, `.ino` = step runner + safety + telemetry + console. Its README explains every setting. |
+| `calibration/` | Tuning sketches in order (README has pictures): `Slide_Encoder_Check`, `Slide_Test`, `Slide_PID_Tune`, `Servo_Offset_Cal`. `_old/Motor_Pin_Test` is retired. |
+| `SEQUENCE_TUNING.md` | How to tune the sequence in the editor first, then confirm on the robot. |
+| `tools/sequence_editor.html` | Edit the sequence with the 3D twin (play bar, Fusion-style camera), plain-English Step tab, offline jog + capture, predicted timing, live link to the robot (Web Serial), servo calibration. Needs `three.min.js` + `twin_model.js` beside it. Screenshots in `tools/img/`. |
+| `tools/run_viewer.html` | Logged runs: plots, Gantt, FF fit, 3D twin. |
+| `tools/capture_log.py` | Serial → `logs/run_*.csv` plus a `.html` with the run embedded. |
+| `tools/cad_twin/` | STEP → `twin_model.js` pipeline. Mesh IDs change on every re-export. |
+| `tools/sil_sim/` | PC build of V2.1 against mocks plus a slide plant model. |
+| `Robot_Controller/`, `Robot_Controller_V2/` | V1 and V2 programs. Reference only. `Version 1 Demonstration.mp4` shows the V1 sequence V2.1 copies for the transfer. |
+| `logs/` | Captured runs. |
 
-## Known gotchas
+## Status
 
-- **Battery off makes the encoder count drift by itself** (seen 14 Oct 2026). With USB only, the count ran away while the slide was still, and `Slide_Test` moves aborted. It worked once the battery was on. Likely cause: the encoder's 5 V or ground comes from the battery-side rail. Always test with the battery ON. If the count drifts, check the battery first.
+- V2.1 rewritten as a table-driven sequence (15 Oct). Compiles, passes the SIL run. **Not run on the robot yet.**
+- **Next on the robot:**
+  - `Servo_Offset_Cal`, then the editor's Calibration tab (twin angles become real);
+  - confirm slide motor direction (`calibration/Slide_Encoder_Check`);
+  - measure `X_CREEP` / `X_TIP` (placeholders 450 / 530 mm; CAD says ~1650 / 1740);
+  - tune `S_CARRY`, `S_POUR`, `PICKUP` time; slide gains;
+  - measure the real slide angle and robot height.
+- See ROBOT_SPECS.md §7 for the full open list.
 
-## Electrical
+## Known mismatches (fix when you touch the file)
 
-> **The KiCad schematic (shared 14 Oct 2026) is OUT OF DATE.** Tinzen confirmed it shows an old motor driver, and its Nano pin map doesn't match the robot. The real hardware is a custom green mainboard carrying the Nano, a PCA9685 servo board, a buck converter (6R8 inductor, blue LED, screw-terminal output) and a heatsinked motor driver board. Trust the "Confirmed working" pins above over anything below.
+- `calibration/Slide_Test` and `Slide_PID_Tune` print paste lines named `OUTTAKE_K*`. V2.1 now calls them `SLIDE_K*` (same units).
+- `Robot_Controller_V2`: pins 6/7/11, encoder direction +1. Reference only; don't fix it.
+- Twin: at `A_START` the CAD scoop still overlaps the bucket a little. The servo calibration (or the scale check) settles it.
 
-**Actual outtake motor driver (photo, 14 Oct 2026):** heatsinked driver board with **two direction inputs + PWM** (IN1/IN2 + PWM style, like L298N / VNH-type drivers). The exact part number hasn't been recorded yet. **MA (D8) and MB (D9) are BOTH needed**: MA high/MB low = one direction, MA low/MB high = the other, and both low with PWM 0 = stop (brake or coast depending on the chip). This matches `MotorController` as written, so no refactor is needed.
+## Gotchas
 
-### Old schematic (for reference only, shared 14 Oct 2026)
+- **Battery ON for any encoder or motor test.** On USB alone the encoder count drifts.
+- **Opening the serial port resets the Nano.** In `RUN_FULL` with `WAIT_FOR_GO = false` that starts a run. Use `RUN_CONSOLE` or `WAIT_FOR_GO = true` on the bench, never at the competition.
+- The encoder must stay on D2/D3 (the only interrupt pins).
+- **The KiCad schematic is out of date.** Trust ROBOT_SPECS.md.
+- Hobby servos can't report position: "arrived" for a servo move is an estimate.
 
-**Power**
-- Battery is 12-17 V, then a 7.5 A fuse (F1), then a DPDT switch (SW1A), then the 12-17 V rail.
-- Bulk caps on the 12-17 V rail: 1000 uF + 4 x 100 uF.
-- Buck converter: 12-17 V to **+5V**. This feeds the servo power (PCA9685 V+) and, per the schematic, the Nano VIN.
-- **LOGIC** net = the Nano's 5 V pin. It feeds the PCA9685 VCC, the motor driver +5V and the TMC2209 VIO.
-- Encoder J1: pin 1 = 5V, 2 = GND, 3 = CH.A, 4 = CH.B. Its 5 V comes from the battery side, which explains the "battery off -> encoder drifts" gotcha.
+## Change log
 
-**Old schematic's motor driver: IRF3205 module (DIR + PWM type). NOT what's on the robot.**
-- Inputs: DIR1 (direction, high/low), PWM1 (speed duty), +5V (logic), GND. Channel 2 (DIR2/PWM2) is unused.
-- Power: PWR = 12-17 V. Outputs 1A/1B go to the motor (DC_A/DC_B).
-- (Superseded: the real driver uses both MA and MB; see above.)
-
-**Schematic Nano pin map**
-- D2 = DC_DIR, D3 = DC_PWM, D4 = CH.A, D5 = CH.B
-- D6 = STP_EN1, D7 = STP_STEP1, D8 = STP_DIR1, D9 = STP_EN2, D10 = STP_STEP2, D11 = STP_DIR2
-- A4/A5 = I2C (SDA/SCL) to the PCA9685
-- Servos S1-S5 are on PCA9685 PWM0-4.
-- Two TMC2209 stepper drivers (NEMA17) appear in the schematic. No current firmware uses them.
-
-**Pin mismatch: RESOLVED for the outtake (14 Oct 2026).** The physical robot does **not** follow the schematic pin map. Real wiring: motor **MA=D8, MB=D9, PWM=D11**, encoder **D2/D3**. The motor runs with these; with 6/7/11 it got no power.
-- On the real driver, D8 (MA) and D9 (MB) go to the two direction inputs and D11 to PWM. Which input is IN1 doesn't matter: direction is set by `OUTTAKE_MOTOR_DIRECTION`.
-- Treat the schematic's Nano pin numbers as unreliable until someone checks them against the board. The schematic should be updated to match the real wiring.
-- `Slide_Test` has 8/9/11 (updated by Tinzen). **`Robot_Controller_V2_1` still has 6/7/11 and must change to 8/9/11.** `Slide_Encoder_Check` (6/7/11) and `Motor_Pin_Test` (DIR 6, PWM 11) also still have the old pins.
-
-**To check:** the schematic appears to put the buck +5V into the Nano **VIN**. VIN goes through the Nano's regulator, which needs about 7 V or more, so 5 V on VIN gives a sagging logic rail when USB is unplugged (i.e. at the competition). Feeding the buck 5 V into the Nano's 5V pin is the usual fix. Verify on the real board.
+- **14 Oct 2026**:
+  - Pins confirmed as MA 8 / MB 9 / PWM 11, encoder on 2/3; the driver is IN1/IN2 + PWM.
+  - Encoder direction −1 (Slide_Test). Spool 36.15 mm with 1:1 stringing, so 0.5317 mm/count.
+  - Slide_Test travel limit removed (Tinzen). Slide_PID_Tune added. Battery-off encoder drift found.
+- **15 Oct 2026 (morning)**:
+  - AGENTS.md rewritten as the entry point; numbers moved to ROBOT_SPECS.md; CLAUDE.md points here.
+  - V2.1 pins 6/7 → 8/9, encoder direction −1, mm/count 0.5317. Slide_Encoder_Check pins 6/7 → 8/9.
+  - Twin: motor-end bracket fixed, stray standoff removed (CAD footprint 393 × 370 mm).
+- **15 Oct 2026 (afternoon)**:
+  - V2.1 rewritten: sequence table in `Sequence.h` (V2 intake, V1 transfer with carry/pour/vibrate, slides fast → creep blend → tip hold → retract), hardware in `RobotConfig.h`, servos in degrees with a 3-number reference-pose calibration, step mode, slow mode, live-link console commands, RETRACT fallback on a slide stall. Adafruit servo library replaced by a small PCA9685 driver (same 50 Hz setup) to fit in flash.
+  - Twin scoop direction flipped (+1): with it the scoop holds rocks at SCOOP/PICKUP and pours at TRANSFER. Reference pose from CAD: arm 110.6°, scoop −69.4°.
+  - New `tools/sequence_editor.html`; `calibration/` folder (Slide_Encoder_Check, Slide_Test, Slide_PID_Tune moved in; new Servo_Offset_Cal; Motor_Pin_Test retired to `_old`).
+  - `tools/sil_sim` updated for the new firmware.
+- **15 Oct 2026 (evening)**:
+  - Servo calibration set from Tinzen: the V2 SCOOP pose (R 940 / L 2060 / scoop 1900 µs) lies flat on the floor, so `*_CAL_US` = 940 / 2060 / 1900 and every angle in `Sequence.h` re-worked with the same pulse widths (A_SCOOP 110.6°, S_SCOOP −69.4° = the reference pose). Soft limits −55…125° / −260…20°. Robot motion unchanged.
+  - Sequence editor: play bar on the twin, Fusion 360 / Inventor camera, Step tab (plain-English step editor), "What happens" column, add-step presets, jog sliders that pose the twin with no robot and capture arm, scoop and slide values. New `SEQUENCE_TUNING.md`.
+  - Sequence editor: drag timeline edges to retime a step, drag rows to reorder, spill warning (scoop pours while loaded before the arm is over the bucket), before/after ghost when editing or jogging an angle. The twin flags a ~0.1 s spill risk at the LIFT → CARRY hand-over (arm ~30°); check on the robot, values not changed.
+  - `tools/run_viewer.html`: same Fusion 360 / Inventor camera as the editor (patched in place).

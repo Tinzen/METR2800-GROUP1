@@ -67,42 +67,42 @@ struct Slide {
   double x = 0.0, v = 0.0;
   double xMax = 6000.0;          // physical end of travel
   double contact = 4300.0;       // bucket touches the hopper pole here
-} slide;
+} plant;
 static long encOffset = 0;
 // plant knobs (override with env vars SIM_GRAVITY / SIM_FRICTION / SIM_XMAX)
 static double simGravity = 0.07, simFriction = 0.045;
 
 static double drive() {
-  // pins 6/7 direction, 11 PWM (see firmware OUTTAKE_* pins)
+  // pins 8/9 direction, 11 PWM (RobotConfig.h)
   double u = pwmValue[11] / 255.0;
-  if (pinLevel[6] && !pinLevel[7]) return u;
-  if (!pinLevel[6] && pinLevel[7]) return -u;
+  if (pinLevel[8] && !pinLevel[9]) return u;
+  if (!pinLevel[8] && pinLevel[9]) return -u;
   return 0.0;
 }
 
 static void plantStep(double dt) {
   const double vFree = 2600.0, tau = 0.06;
   const double k = vFree / tau;                   // t/s^2 per unit drive
-  double F = (vFree * drive() - slide.v) / tau;   // motor
+  double F = (vFree * drive() - plant.v) / tau;   // motor
   double Fg = -simGravity * k;                    // gravity pulls it back down
   double Ff = simFriction * k;                    // coulomb friction
-  if (slide.x > slide.contact) Fg -= 0.05 * k * std::min(1.0, (slide.x - slide.contact) / 200.0); // tipping bucket
+  if (plant.x > plant.contact) Fg -= 0.05 * k * std::min(1.0, (plant.x - plant.contact) / 200.0); // tipping bucket
   double a;
-  if (fabs(slide.v) < 5.0) {
+  if (fabs(plant.v) < 5.0) {
     double net = F + Fg;
-    if (fabs(net) <= Ff) { slide.v = 0.0; a = 0.0; }
+    if (fabs(net) <= Ff) { plant.v = 0.0; a = 0.0; }
     else a = net - (net > 0 ? Ff : -Ff);
   } else {
-    a = F + Fg - (slide.v > 0 ? Ff : -Ff);
+    a = F + Fg - (plant.v > 0 ? Ff : -Ff);
   }
-  slide.v += a * dt;
-  slide.x += slide.v * dt;
-  if (slide.x < 0.0) { slide.x = 0.0; if (slide.v < 0) slide.v = 0; }
-  if (slide.x > slide.xMax) { slide.x = slide.xMax; if (slide.v > 0) slide.v = 0; }
+  plant.v += a * dt;
+  plant.x += plant.v * dt;
+  if (plant.x < 0.0) { plant.x = 0.0; if (plant.v < 0) plant.v = 0; }
+  if (plant.x > plant.xMax) { plant.x = plant.xMax; if (plant.v > 0) plant.v = 0; }
 }
 
-long sim_encoder_read() { return (long)floor(slide.x) + encOffset; }
-void sim_encoder_write(long v) { encOffset = v - (long)floor(slide.x); }
+long sim_encoder_read() { return -(long)floor(plant.x) + encOffset; }
+void sim_encoder_write(long v) { encOffset = v + (long)floor(plant.x); }
 
 static void advanceUs(double us) {
   // drain serial
@@ -137,10 +137,11 @@ int main(int argc, char** argv) {
   size_t si = 0;
   std::uniform_real_distribution<double> jitter(0.0, 80.0);
 
-  if (getenv("SIM_X0")) slide.x = atof(getenv("SIM_X0"));
+  if (getenv("SIM_X0")) plant.x = atof(getenv("SIM_X0"));
   if (getenv("SIM_GRAVITY")) simGravity = atof(getenv("SIM_GRAVITY"));
   if (getenv("SIM_FRICTION")) simFriction = atof(getenv("SIM_FRICTION"));
-  if (getenv("SIM_XMAX")) slide.xMax = atof(getenv("SIM_XMAX"));
+  if (getenv("SIM_XMAX")) plant.xMax = atof(getenv("SIM_XMAX"));
+  if (getenv("SIM_CONTACT")) plant.contact = atof(getenv("SIM_CONTACT"));
   setup();
   while (simUs < seconds * 1e6) {
     while (si < script.size() && millis() >= script[si].first) {
@@ -151,6 +152,6 @@ int main(int argc, char** argv) {
     loop();
     advanceUs(320.0 + jitter(rng));       // AVR float math etc.
   }
-  fprintf(stderr, "sim end: slide x=%.0f v=%.0f\n", slide.x, slide.v);
+  fprintf(stderr, "sim end: slide x=%.0f v=%.0f servo counts R=%u L=%u S=%u\n", plant.x, plant.v, servoCounts[0], servoCounts[1], servoCounts[2]);
   return 0;
 }
