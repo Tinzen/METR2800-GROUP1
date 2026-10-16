@@ -81,8 +81,8 @@ void MotorController::setFeedforward(float kS, float kV, float kA, float kG) {
   ffG = kG;
 }
 
-void MotorController::setProfileLimits(float maxVelocity, float maxAcceleration) {
-  profile.setLimits(maxVelocity, maxAcceleration);
+void MotorController::setProfileLimits(float maxVelocity, float maxAcceleration, float maxDeceleration) {
+  profile.setLimits(maxVelocity, maxAcceleration, maxDeceleration);
 }
 
 void MotorController::setLimits(float maxVelocity, float maxAcceleration) {
@@ -223,6 +223,10 @@ bool MotorController::isProfileFinished() const {
 
 float MotorController::getProfileTotalTime() const {
   return profile.getTotalTime();
+}
+
+float MotorController::getProfileTimeLeft() const {
+  return useMotionProfile ? profile.getTimeLeft() : 0.0f;
 }
 
 float MotorController::getProfileProgress() const {

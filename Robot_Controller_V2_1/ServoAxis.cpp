@@ -8,8 +8,8 @@ ServoAxis::ServoAxis(ServoWriteFn writer, float minDeg, float maxDeg)
   mode(IDLE), writeIntervalMs(20), vibHalfPeriodMs(50), vibPositive(true)
 {}
 
-void ServoAxis::setLimits(float maxVelocity, float maxAcceleration) {
-  profile.setLimits(maxVelocity, maxAcceleration);
+void ServoAxis::setLimits(float maxVelocity, float maxAcceleration, float maxDeceleration) {
+  profile.setLimits(maxVelocity, maxAcceleration, maxDeceleration);
 }
 
 void ServoAxis::setWriteInterval(unsigned long ms) { writeIntervalMs = ms; }
@@ -89,6 +89,10 @@ bool ServoAxis::isFinished() const { return mode == IDLE; }
 
 float ServoAxis::getProgress() const {
   return (mode == PROFILE) ? profile.getProgress() : 1.0f;
+}
+
+float ServoAxis::getTimeLeft() const {
+  return (mode == PROFILE) ? profile.getTimeLeft() : 0.0f;
 }
 
 bool ServoAxis::isVibrating() const { return vibrating; }

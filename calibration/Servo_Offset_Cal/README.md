@@ -2,7 +2,7 @@
 
 Finds the three servo pulse widths (right arm, left arm, scoop) at a known pose. With them, the angles in `Sequence.h` and the sequence editor's twin are real degrees.
 
-> **Easier:** with `Robot_Controller_V2_1` uploaded, the sequence editor's **Calibrate servos** tab does the same procedure with buttons over the live link (Connect & move → Hold still → Connect robot). Use this sketch when the editor isn't an option.
+> **Easier:** with `Robot_Controller_V2_1` uploaded, the sequence editor's **Calibrate servos** tab does the same procedure with buttons over the live link (**Connect robot**, top right, with ▾ = hold still and wait). Use this sketch when the editor isn't an option.
 
 **Why it's needed:** hobby servos have no position feedback. The code turns an angle into a pulse width with:
 

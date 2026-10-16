@@ -47,6 +47,8 @@ const int   SLIDE_MAX_PWM = 250;
 const float SLIDE_TOLERANCE_MM = 0.83f;       // PID deadband   (16 Oct: /1.8 with the ratio fix, same counts as before)
 const float SLIDE_ARRIVE_TOL_MM = 6.7f;       // "close enough" to finish a step   (was 12 at the old scale)
 const float SLIDE_SETTLED_TOL_MM = 44.4f;     // stopped this close also counts (logs SETTLED_SHORT)   (was 80)
+const float SLIDE_END_STOP_MM = 1694.0f;     // measured end stop (15 Oct logs, ROBOT_SPECS §3). Not a limit: the robot
+                                              // doesn't use it; the sequence editor warns about targets past it
 
 // ---- SERVO CALIBRATION  (set by calibration/Servo_Offset_Cal) ------------------
 // Reference pose = scoop laid FLAT on the intake floor (a hard stop).

@@ -21,7 +21,7 @@ class ServoAxis {
   public:
     ServoAxis(ServoWriteFn writer, float minDeg, float maxDeg);
 
-    void setLimits(float maxVelocity, float maxAcceleration);  // deg/s, deg/s^2
+    void setLimits(float maxVelocity, float maxAcceleration, float maxDeceleration);  // deg/s, deg/s^2 (speeding up, slowing down)
     void setWriteInterval(unsigned long ms);
 
     void begin(float startDeg);       // write now, no motion
@@ -35,6 +35,7 @@ class ServoAxis {
 
     bool isFinished() const;          // profile complete
     float getProgress() const;        // 0..1 of the current move
+    float getTimeLeft() const;        // s until the current move is planned to finish (0 = finished)
     bool isVibrating() const;
     float getTarget() const;
     float getCommand() const;         // best estimate of where the servo is (no vibration)

@@ -40,7 +40,7 @@ class MotorController {
 
     void setPID(float kp, float ki, float kd);
     void setFeedforward(float kS, float kV, float kA, float kG);   // V2.1
-    void setProfileLimits(float maxVelocity, float maxAcceleration);
+    void setProfileLimits(float maxVelocity, float maxAcceleration, float maxDeceleration = -1.0f);   // decel < 0 = same as accel
     void setLimits(float maxVelocity, float maxAcceleration); // alias
     void setMaxPwm(int maxPwm);
     void setTolerance(float tolerance);
@@ -70,6 +70,7 @@ class MotorController {
     bool isAtTarget();
     bool isProfileFinished() const;
     float getProfileTotalTime() const;   // V2.1: seconds for the current move
+    float getProfileTimeLeft() const;    // seconds until the profile is planned to finish (0 = done)
     float getProfileProgress() const;    // 0..1 of the current move
     UnitMode getUnitMode() const;
     MotorMode getMode() const;       // V2.1

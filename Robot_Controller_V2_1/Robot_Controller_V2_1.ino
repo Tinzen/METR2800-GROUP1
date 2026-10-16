@@ -89,6 +89,9 @@ unsigned long arrivedAtMs = 0;    // WAIT_ARRIVED: when everything arrived (0 = 
 bool stepMode = STEP_MODE_AT_BOOT;
 float speedK = SPEED_PCT_AT_BOOT / 100.0f;
 bool armMovedThisStep = false, scoopMovedThisStep = false, slideMovedThisStep = false;
+bool slideUsed = false;           // a step of this run has commanded the slides (WAIT_ARRIVED waits for them)
+bool slideDone = true;            // the slides' last move has arrived (latched until the next slide command)
+bool shortLogged = false;         // SETTLED_SHORT logged for this move
 bool fallbackUsed = false;
 bool waitingForGo = false;
 bool consoleMode = (RUN_MODE == RUN_CONSOLE);   // true = bench: wait for commands
@@ -97,7 +100,7 @@ bool manualServos = false;                       // calibration: raw pulses, not
 // slides (mm in the sequence, counts in the controller)
 float slideTargetMm = 0.0f;
 float slideVEndMm = 0.0f;         // >0: this segment hands its speed to the next step
-unsigned long slideTimeoutMs = 0;
+unsigned long slideTimeoutMs = 0, slideCmdMs = 0;
 bool slideStalled = false, stallCond = false, dirBad = false;
 bool settleCond = false, slideSettled = false;
 unsigned long stallSinceMs = 0, dirBadSinceMs = 0, settledSinceMs = 0, jogEndMs = 0;
@@ -205,11 +208,18 @@ float slideSpeedFor(const Step& s) {
 void commandSlide(const Step& s, uint8_t i) {
   const float pos = slideMm();
   const float speed = slideSpeedFor(s);
-  const float accel = ((s.slideSpeed == SLIDE_RETRACT_SPEED) ? SLIDE_RETRACT_ACCEL : SLIDE_ACCEL) * speedK * speedK;
+  const bool retract = (s.slideSpeed == SLIDE_RETRACT_SPEED);
+  const float accel = (retract ? SLIDE_RETRACT_ACCEL : SLIDE_ACCEL) * speedK * speedK;
+  const float decel = (retract ? SLIDE_RETRACT_DECEL : SLIDE_DECEL) * speedK * speedK;
 
-  // entry speed: handed over by the previous step (fast -> creep blend).
-  // Step mode pauses between steps, so it never blends.
-  const float vStart = stepMode ? 0.0f : slideVEndMm;
+  // entry speed: handed over by the previous step (fast -> creep blend), or, if the previous
+  // move is still running (an "arrived - ms" guard ended its step early), its speed now when it
+  // goes the same way. Step mode pauses between steps, so it never blends.
+  float vStart = stepMode ? 0.0f : slideVEndMm;
+  if (!stepMode && slideUsed && !slideDone && slide.getMode() == MotorController::ACTIVE && !slide.isProfileFinished()) {
+    const float pv = countsToMm(slide.getProfileVelocity()) * ((s.slide >= pos) ? 1.0f : -1.0f);
+    vStart = (pv > 0.0f) ? pv : 0.0f;
+  }
 
   // exit speed: blend into the next row if it keeps the slides going the same way
   float vEnd = 0.0f;
@@ -225,15 +235,22 @@ void commandSlide(const Step& s, uint8_t i) {
     }
   }
 
-  slide.setProfileLimits(mmToCounts(speed), mmToCounts(accel));
+  slide.setProfileLimits(mmToCounts(speed), mmToCounts(accel), mmToCounts(decel));
   slide.setTargetBlend(mmToCounts(s.slide), SLIDE_MAX_PWM, mmToCounts(vStart), mmToCounts(vEnd));
   slideTargetMm = s.slide;
+  slideUsed = true;
   slideVEndMm = vEnd;
   slideMovedThisStep = true;
+  slideDone = false;
+  shortLogged = false;
+  slideCmdMs = millis();
   slideTimeoutMs = (unsigned long)(slide.getProfileTotalTime() * 1000.0f) + SLIDE_TIMEOUT_MARGIN_MS;
   stallCond = false;
   slideStalled = false;
 }
+
+// a row's ACC% / DEC%: 0 (left out) = 100 %
+float __attribute__((noinline)) pctK(uint8_t p) { return p ? p * 0.01f : 1.0f; }
 
 void enterStep(uint8_t i) {
   stepIndex = i;
@@ -252,11 +269,11 @@ void enterStep(uint8_t i) {
   // going (a move still running is taken over smoothly). HOLD axes carry on.
   const float k2 = speedK * speedK;
   if (armMovedThisStep) {
-    arm.setLimits(((cur.armSpeed > 0.0f) ? cur.armSpeed : ARM_SPEED) * speedK, ARM_ACCEL * k2);
+    arm.setLimits(((cur.armSpeed > 0.0f) ? cur.armSpeed : ARM_SPEED) * speedK, ARM_ACCEL * k2 * pctK(cur.armAccPct), ARM_DECEL * k2 * pctK(cur.armDecPct));
     arm.moveTo(cur.arm);
   }
   if (scoopMovedThisStep) {
-    scoop.setLimits(((cur.scoopSpeed > 0.0f) ? cur.scoopSpeed : SCOOP_SPEED) * speedK, SCOOP_ACCEL * k2);
+    scoop.setLimits(((cur.scoopSpeed > 0.0f) ? cur.scoopSpeed : SCOOP_SPEED) * speedK, SCOOP_ACCEL * k2 * pctK(cur.scoopAccPct), SCOOP_DECEL * k2 * pctK(cur.scoopDecPct));
     scoop.moveTo(cur.scoop);
   }
 
@@ -274,12 +291,14 @@ void enterStep(uint8_t i) {
 }
 
 bool slideArrived() {
+  if (slideDone) return true;                 // latched: it got there (later steps don't re-judge it)
   if (!slide.isProfileFinished()) return false;
   if (slideVEndMm > 0.0f) return true;        // handing over to the next segment
   const float err = fabs(slideTargetMm - slideMm());
-  if (err <= SLIDE_ARRIVE_TOL_MM) return true;
+  if (err <= SLIDE_ARRIVE_TOL_MM) { slideDone = true; return true; }
   if (slideSettled && err <= SLIDE_SETTLED_TOL_MM) {
-    logEvent(F("SETTLED_SHORT"), (long)(slideTargetMm - slideMm()));
+    if (!shortLogged) { shortLogged = true; logEvent(F("SETTLED_SHORT"), (long)(slideTargetMm - slideMm())); }
+    slideDone = true;
     return true;
   }
   return false;
@@ -289,28 +308,44 @@ bool armDone()   { return arm.isFinished(); }
 bool scoopDone() { return scoop.isFinished(); }
 float armProgress() { return arm.getProgress(); }
 
+// seconds until the slides' move is planned to finish (0 = done, or not used in this run)
+float slideLeft() { return (slideUsed && !slideDone) ? slide.getProfileTimeLeft() : 0.0f; }
+
+// seconds until the guard's axis (W_ARRIVED: the last of all three) is planned to arrive
+float guardLeft(uint8_t w) {
+  if (w == W_ARM_DONE) return arm.getTimeLeft();
+  if (w == W_SCOOP_DONE) return scoop.getTimeLeft();
+  const float s = slideLeft();
+  if (w == W_SLIDE_DONE) return s;
+  float left = arm.getTimeLeft();
+  const float sc = scoop.getTimeLeft();
+  if (sc > left) left = sc;
+  if (s > left) left = s;
+  return left;
+}
+
+bool guardArrived(uint8_t w) {
+  if (w == W_ARM_DONE) return armDone();
+  if (w == W_SCOOP_DONE) return scoopDone();
+  if (w == W_SLIDE_DONE) return slideArrived();
+  return armDone() && scoopDone() && (!slideUsed || slideArrived());   // every axis has stopped
+}
+
 bool stepConditionMet() {
   const unsigned long now = millis();
-  const unsigned long el = now - stepStartMs;
-  const unsigned long wv = (unsigned long)(cur.waitValue / speedK);
+  const float el = (float)(now - stepStartMs);
+  const float wv = cur.waitValue / speedK;   // ms (arrived guards: negative = before arriving)
   switch (cur.waitType) {
     case W_MS:
       return el >= wv;
     case W_ARRIVED:
     case W_ARM_DONE:
     case W_SCOOP_DONE:
-    case W_SLIDE_DONE: {
-      // all = every axis this row moved; or just the one axis named (its move may have started earlier)
-      const bool all =
-        (cur.waitType == W_ARM_DONE)   ? armDone() :
-        (cur.waitType == W_SCOOP_DONE) ? scoopDone() :
-        (cur.waitType == W_SLIDE_DONE) ? slideArrived() :
-        ((!armMovedThisStep || armDone()) && (!scoopMovedThisStep || scoopDone()) &&
-         (!slideMovedThisStep || slideArrived()));
-      if (!all) { arrivedAtMs = 0; return false; }
-      if (arrivedAtMs == 0) arrivedAtMs = now | 1UL;
-      return (now - arrivedAtMs) >= wv;
-    }
+    case W_SLIDE_DONE:
+      if (wv < 0.0f) return guardLeft(cur.waitType) * 1000.0f <= -wv;   // that long BEFORE arriving
+      if (!guardArrived(cur.waitType)) { arrivedAtMs = 0; return false; }
+      if (arrivedAtMs == 0) arrivedAtMs = now ? now : 1UL;   // (not now | 1: one ms in the future, so the wait wrapped)
+      return (float)(now - arrivedAtMs) >= wv;
     case W_ARM:
       return armProgress() * 100.0f >= cur.waitValue;
     case W_SCOOP:
@@ -350,13 +385,17 @@ void slideFault(const __FlashStringHelper* code) {
 void updateRunner() {
   if (runState != R_RUNNING) return;
 
-  if (slideMovedThisStep) {
-    const unsigned long el = millis() - stepStartMs;
+  if (slideUsed && !slideDone) {      // a slide move still on its way (it may have started in an earlier step)
+    const unsigned long el = millis() - slideCmdMs;
     if (slideStalled && el >= STALL_IGNORE_START_MS) { slideFault(F("STALL")); return; }
     if (el >= slideTimeoutMs && !slideArrived()) { slideFault(F("TIMEOUT")); return; }
   }
 
-  if (!stepConditionMet()) return;
+  if (!stepConditionMet()) {
+    // OR AFTER: something is stuck (or slower than planned): carry on after the step's time limit
+    if (cur.limitMs == 0 || (millis() - stepStartMs) < (unsigned long)(cur.limitMs / speedK)) return;
+    logEvent(F("STEP_LIMIT"), stepIndex);
+  }
 
   if (stepIndex >= lastStep) { finishRun(); return; }
   if (stepMode) {
@@ -374,6 +413,9 @@ void startRun(uint8_t first) {
   runStartMs = millis();
   fallbackUsed = false;
   slideVEndMm = 0.0f;
+  slideUsed = false;
+  slideDone = true;                                // nothing commanded yet this run
+  slideTargetMm = slideMm();                       // wherever a jog left them
   digitalWrite(END_LED_PIN, LOW);
   runState = R_RUNNING;
   logEvent(F("RUN_START"), first);
@@ -702,20 +744,20 @@ void processCommand(char* cmd) {
     }
     case 'A':
       endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
-      arm.setLimits(ARM_SPEED * 0.5f, ARM_ACCEL * 0.25f);      // jogs at half speed
+      arm.setLimits(ARM_SPEED * 0.5f, ARM_ACCEL * 0.25f, ARM_DECEL * 0.25f);      // jogs at half speed
       arm.moveTo(a1);
       logEvent(F("CMD_A"), (long)(a1 * 10));
       break;
     case 'S':
       endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
-      scoop.setLimits(SCOOP_SPEED * 0.5f, SCOOP_ACCEL * 0.25f);
+      scoop.setLimits(SCOOP_SPEED * 0.5f, SCOOP_ACCEL * 0.25f, SCOOP_DECEL * 0.25f);
       scoop.moveTo(a1);
       logEvent(F("CMD_S"), (long)(a1 * 10));
       break;
     case 'Q': printPose(); break;
     case 'o': {
       const float v = (a2 > 0.0f) ? a2 : SLIDE_FAST;
-      slide.setProfileLimits(mmToCounts(v), mmToCounts(SLIDE_ACCEL));
+      slide.setProfileLimits(mmToCounts(v), mmToCounts(SLIDE_ACCEL), mmToCounts(SLIDE_DECEL));
       slide.setTarget(mmToCounts(a1 < 0.0f ? 0.0f : a1), SLIDE_MAX_PWM);
       jogEndMs = 0;
       logEvent(F("CMD_O"), (long)a1);
@@ -757,7 +799,7 @@ void processCommand(char* cmd) {
           const float dir = tgt - slide.getPosition();
           float pv = (slide.getMode() == MotorController::ACTIVE) ? slide.getProfileVelocity() * dir : 0.0f;
           float ev = mmToCounts(a4) * dir;                // > 0 = same way as the move
-          slide.setProfileLimits(mmToCounts(SLIDE_RETRACT_SPEED), mmToCounts(SLIDE_RETRACT_ACCEL));
+          slide.setProfileLimits(mmToCounts(SLIDE_RETRACT_SPEED), mmToCounts(SLIDE_RETRACT_ACCEL), mmToCounts(SLIDE_RETRACT_DECEL));
           slide.setTargetBlend(tgt, SLIDE_MAX_PWM, pv > 0.0f ? pv / fabs(dir) : 0.0f, ev > 0.0f ? ev / fabs(dir) : 0.0f);
           jogEndMs = 0;
         }
@@ -790,7 +832,7 @@ void configureSlide() {
   slide.setMotorDirection(SLIDE_MOTOR_DIR);
   slide.setPID(SLIDE_KP, SLIDE_KI, SLIDE_KD);
   slide.setFeedforward(SLIDE_KS, SLIDE_KV, SLIDE_KA, SLIDE_KG);
-  slide.setProfileLimits(mmToCounts(SLIDE_FAST), mmToCounts(SLIDE_ACCEL));
+  slide.setProfileLimits(mmToCounts(SLIDE_FAST), mmToCounts(SLIDE_ACCEL), mmToCounts(SLIDE_DECEL));
   slide.setMaxPwm(SLIDE_MAX_PWM);
   slide.setTolerance(mmToCounts(SLIDE_TOLERANCE_MM));
   slide.begin(0.0f);                          // slides are fully in at power-up

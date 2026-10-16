@@ -15,7 +15,7 @@ Status tags:
 
 | Item | Value | Status | Code (files) |
 |---|---|---|---|
-| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1 uses 28.9 KB / 1.16 KB. | confirmed | n/a |
+| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1: 28,840 B / 1,140 B with avr-gcc here (16 Oct); the IDE reads about 1 KB more flash. | confirmed | n/a |
 | Outtake driver | Heatsinked **IN1/IN2 + PWM** board (part number not recorded) | confirmed 14 Oct | n/a |
 | Motor dir A | **D8** | confirmed 14 Oct | `OUTTAKE_MA` (V2_1 `RobotConfig.h`, calibration/Slide_Test, Slide_PID_Tune); `MOTOR_A` (calibration/Slide_Encoder_Check) |
 | Motor dir B | **D9** | confirmed 14 Oct | `OUTTAKE_MB`, `MOTOR_B` |
@@ -56,7 +56,7 @@ The motor drive logic is: MA high + MB low = one direction; MA low + MB high = t
 | Stall pull | 1.83 N·m motor = 1.83 N·m at the spool (1:1) → **about 101 N** of string pull | calc | n/a |
 | Moving mass | Not measured (needed for the accel limit and kA) | TODO | n/a |
 | Slides | 9 stages × 400 mm, stacked 10 mm apart | CAD | n/a |
-| Max safe travel | **End stop at ~1694 mm** (~5735 counts): every 15 Oct full run stalled there during CREEP. Slide_Test has no limit (Tinzen's choice). The stall cut-out is the only end protection. | measured 15 Oct (logs) | V2_1 has no soft limit either; the stall fallback retracts. |
+| Max safe travel | **End stop at ~1694 mm** (~5735 counts): every 15 Oct full run stalled there during CREEP. Slide_Test has no limit (Tinzen's choice). The stall cut-out is the only end protection. | measured 15 Oct (logs) | `SLIDE_END_STOP_MM` (V2_1 `RobotConfig.h`): not a soft limit, the firmware doesn't use it; the sequence editor warns about targets past it. The stall fallback retracts. |
 | Creep start / bucket fully tipped | `X_CREEP` **1666.7 mm**, `X_TIP` **1788.9 mm**: the 15 Oct tuning values (3000 / 3220) re-scaled to the true mm/count, so the motion in counts is unchanged. `X_TIP` is **past the ~1694 mm end stop**, so CREEP ends in a STALL and the FALLBACK skips TIP_HOLD. CAD estimate ~1650 / 1740. | **TODO: set X_TIP below the stop** | `X_CREEP`, `X_TIP` (V2_1 `Sequence.h`) |
 
 V2_1's sequence uses **mm from fully retracted** (zeroed at power-up: slides must be fully in). The controller runs in encoder counts internally. Slide_Test and Slide_PID_Tune take mm on serial.
@@ -114,7 +114,7 @@ Named poses are sequence values and live in `Sequence.h` (degrees). The tested V
 2. Motor direction (does `j 100 300` extend?).
 3. `X_CREEP` / `X_TIP`: jog until the bucket touches the pole / has tipped.
 4. Slide gains: `calibration/Slide_PID_Tune`, then `SLIDE_K*`.
-5. `S_CARRY`, `S_POUR`, `PICKUP` time: tune in the sequence editor (Step & move tab, or drag the ◆ on the timeline with Robot follows timeline on).
+5. `S_CARRY`, `S_POUR`, `PICKUP` time: tune in the sequence editor (Step tab, or drag the ◆ on the timeline with Drives: Robot · live).
 6. Real slide angle, and max safe travel.
 7. Real robot height against the 400 mm cube.
 8. Motor driver part number; Nano VIN vs 5V feed.

@@ -9,6 +9,8 @@
 
 The same script works for `Robot_Controller_V2_1`, `calibration/Slide_Test` and `calibration/Slide_PID_Tune`.
 
+> **Tuning with the sequence editor? You may not need this script.** The editor (`tools/sequence_editor.html`) records every run it starts on the robot (Drives: Robot · live plays and Robot · uploaded runs, plus any run it sees start, e.g. "run once" on connect) and saves it to `logs/run_<date>_<time>_editor_….csv` in the same format, so `tools/run_viewer.html` opens it too. Open the `METR2800-GROUP1` folder in the editor (not `Robot_Controller_V2_1`) so it can write to `logs/`. Only one program can hold the USB port: close the editor's connection before running this script, and the other way round.
+
 You only do **Part 1** once per computer.
 
 ---

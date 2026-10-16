@@ -13,7 +13,8 @@ class MotionProfile {
     MotionProfile();
 
     // Units are whatever the owner uses (degrees, encoder ticks, ...).
-    void setLimits(float maxVelocity, float maxAcceleration);
+    // maxDeceleration < 0 (default) = the same as maxAcceleration (symmetric trapezoid).
+    void setLimits(float maxVelocity, float maxAcceleration, float maxDeceleration = -1.0f);
 
     float getTarget() const;
     float getCurrent() const;
@@ -22,7 +23,7 @@ class MotionProfile {
     // startVel / endVel are speeds (>= 0) in the direction of travel.
     void moveToVel(float startPosition, float targetPosition, float startVel, float endVel);
     // Take over from a move in progress: curVel is its signed velocity now. Same way as the
-    // new target = carry the speed in; the other way = brake to a stop first (at maxAcc), then go.
+    // new target = carry the speed in; the other way = brake to a stop first (at maxDec), then go.
     void moveFrom(float startPosition, float targetPosition, float curVel);
     float update();
     bool isFinished() const;
@@ -30,13 +31,15 @@ class MotionProfile {
     float getVelocity() const;      // signed units/s at last update()
     float getAcceleration() const;  // signed units/s^2 at last update()
     float getTotalTime() const;     // seconds for the current move (incl. any braking)
+    float getTimeLeft() const;      // seconds until the current move is planned to finish (0 = done)
     float getProgress() const;      // 0..1 of distance at last update()
     float getMaxVelocity() const;
     float getMaxAcceleration() const;
 
   private:
     float maxVel;
-    float maxAcc;
+    float maxAcc;      // speeding up
+    float maxDec;      // slowing down (and braking in moveFrom)
 
     float startPos;
     float targetPos;

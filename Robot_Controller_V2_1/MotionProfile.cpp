@@ -4,14 +4,16 @@
 // Used as a member of global objects (zero-filled at boot): only the members
 // that must start non-zero are set here, which keeps flash small on the Nano.
 MotionProfile::MotionProfile()
-: maxVel(100.0f), maxAcc(200.0f), direction(1.0f), done(true), progress(1.0f)
+: maxVel(100.0f), maxAcc(200.0f), maxDec(200.0f), direction(1.0f), done(true), progress(1.0f)
 {}
 
-void MotionProfile::setLimits(float maxVelocity, float maxAcceleration) {
+void MotionProfile::setLimits(float maxVelocity, float maxAcceleration, float maxDeceleration) {
   maxVel = fabs(maxVelocity);
   maxAcc = fabs(maxAcceleration);
+  maxDec = (maxDeceleration < 0.0f) ? maxAcc : maxDeceleration;
   if (maxVel < 0.001f) maxVel = 0.001f;   // guard against divide-by-zero
   if (maxAcc < 0.001f) maxAcc = 0.001f;
+  if (maxDec < 0.001f) maxDec = 0.001f;
 }
 
 float MotionProfile::getTarget() const { return targetPos; }
@@ -39,7 +41,7 @@ void MotionProfile::moveToVel(float startPosition, float targetPosition, float s
   if (v1 > maxVel) v1 = maxVel;
 
   if (totalDist < 0.001f) {
-    vPeak = 0.0f; acc1 = 0.0f; dec3 = maxAcc;
+    vPeak = 0.0f; acc1 = 0.0f; dec3 = maxDec;
     d1 = d2 = 0.0f; t1 = t2 = t3 = 0.0f; totalTime = 0.0f;
     currentPos = targetPos;
     progress = 1.0f;
@@ -55,8 +57,8 @@ void MotionProfile::moveFrom(float startPosition, float targetPosition, float cu
     moveToVel(startPosition, targetPosition, curVel, 0.0f);
     return;
   }
-  // heading away from the new target: brake to a stop at maxAcc, then a normal move from there
-  const float tb = fabs(curVel) / maxAcc;
+  // heading away from the new target: brake to a stop at maxDec, then a normal move from there
+  const float tb = fabs(curVel) / maxDec;
   moveToVel(startPosition + 0.5f * curVel * tb, targetPosition, 0.0f, 0.0f);
   revT = tb;
   revV = curVel;
@@ -66,35 +68,46 @@ void MotionProfile::moveFrom(float startPosition, float targetPosition, float cu
   done = false;
 }
 
-// Phase 1: v0 -> vPeak (accel or decel), phase 2: cruise, phase 3: vPeak -> v1.
-// With v0 = v1 = 0 this is the v1 class's symmetric trapezoid/triangle.
+// Phase 1: v0 -> vPeak at maxAcc (or, arriving faster than maxVel, down to it at maxDec),
+// phase 2: cruise, phase 3: vPeak -> v1 at maxDec.
+// With v0 = v1 = 0 and maxDec = maxAcc this is the v1 class's symmetric trapezoid/triangle.
 void MotionProfile::plan() {
   const float a = maxAcc;
+  const float b = maxDec;
   const float d = totalDist;
   float vp = maxVel;
-  if (v0 > vp) vp = v0;            // arriving faster than this move's cruise: slow down first
+  const bool slowIn = (v0 > vp);   // arriving faster than this move's speed: slow down to it first
+  const float r1 = slowIn ? b : a; // phase 1 rate
 
-  float da = fabs(vp * vp - v0 * v0) / (2.0f * a);
-  float dd = (vp * vp - v1 * v1) / (2.0f * a);
+  float da = fabs(vp * vp - v0 * v0) / (2.0f * r1);
+  float dd = (vp * vp - v1 * v1) / (2.0f * b);
 
-  dec3 = a;
+  dec3 = b;
   if (da + dd > d) {
-    // Not enough room to reach cruise speed: triangular peak.
-    float vt2 = a * d + 0.5f * (v0 * v0 + v1 * v1);
-    float vt = sqrt(vt2);
-    if (vt >= v0 && vt >= v1) {
-      vp = vt;
-    } else if (v1 > v0) {
-      // can't even reach v1: accelerate the whole way
-      vp = sqrt(v0 * v0 + 2.0f * a * d);
-      v1 = vp;
-    } else {
-      // can't slow to v1 in time: decelerate the whole way, harder than maxAcc if needed
+    if (slowIn) {
+      // too short to slow to maxVel and then to v1 (both at maxDec): slow down the whole way, harder if needed
       vp = v0;
       dec3 = (v0 * v0 - v1 * v1) / (2.0f * d);
+      if (dec3 < b) dec3 = b;
       if (dec3 < 0.001f) dec3 = 0.001f;
+    } else {
+      // Not enough room to reach cruise speed: triangular peak, (vt^2 - v0^2)/2a + (vt^2 - v1^2)/2b = d
+      float vt2 = (2.0f * a * b * d + b * v0 * v0 + a * v1 * v1) / (a + b);
+      float vt = sqrt(vt2);
+      if (vt >= v0 && vt >= v1) {
+        vp = vt;
+      } else if (v1 > v0) {
+        // can't even reach v1: accelerate the whole way
+        vp = sqrt(v0 * v0 + 2.0f * a * d);
+        v1 = vp;
+      } else {
+        // can't slow to v1 in time: decelerate the whole way, harder than maxDec if needed
+        vp = v0;
+        dec3 = (v0 * v0 - v1 * v1) / (2.0f * d);
+        if (dec3 < 0.001f) dec3 = 0.001f;
+      }
     }
-    da = fabs(vp * vp - v0 * v0) / (2.0f * a);
+    da = fabs(vp * vp - v0 * v0) / (2.0f * r1);
     dd = (vp * vp - v1 * v1) / (2.0f * dec3);
     if (da + dd > d) {                 // float rounding
       const float s = d / (da + dd);
@@ -103,11 +116,11 @@ void MotionProfile::plan() {
   }
 
   vPeak = vp;
-  acc1 = (vp >= v0) ? a : -a;
+  acc1 = (vp >= v0) ? r1 : -r1;
   d1 = da;
   d2 = d - da - dd;
   if (d2 < 0.0f) d2 = 0.0f;
-  t1 = fabs(vp - v0) / a;
+  t1 = fabs(vp - v0) / r1;
   t2 = (vp > 0.0001f) ? d2 / vp : 0.0f;
   t3 = (vp - v1) / dec3;
   if (t3 < 0.0f) t3 = 0.0f;
@@ -151,7 +164,7 @@ float MotionProfile::update() {
   const unsigned long now = millis();
   float elapsed = (now - startTimeMs) / 1000.0f;
   if (elapsed < revT) {                     // moveFrom: still braking from the old move
-    const float a = (revV > 0.0f) ? -maxAcc : maxAcc;
+    const float a = (revV > 0.0f) ? -maxDec : maxDec;
     currentVel = revV + a * elapsed;
     currentAcc = a;
     currentPos = revP + revV * elapsed + 0.5f * a * elapsed * elapsed;
@@ -183,6 +196,11 @@ bool MotionProfile::isFinished() const { return done; }
 float MotionProfile::getVelocity() const { return currentVel; }
 float MotionProfile::getAcceleration() const { return currentAcc; }
 float MotionProfile::getTotalTime() const { return revT + totalTime; }
+float MotionProfile::getTimeLeft() const {
+  if (done) return 0.0f;
+  const float left = revT + totalTime - (millis() - startTimeMs) / 1000.0f;
+  return (left > 0.0f) ? left : 0.0f;
+}
 float MotionProfile::getProgress() const { return progress; }
 float MotionProfile::getMaxVelocity() const { return maxVel; }
 float MotionProfile::getMaxAcceleration() const { return maxAcc; }

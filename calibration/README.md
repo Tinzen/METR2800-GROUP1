@@ -10,7 +10,7 @@ To save a test as graphs instead (Slide_Test, Slide_PID_Tune), use the Python lo
 | 2 | `Slide_Test` | static friction and gravity (`ks`, `kg`), where the bucket touches the pole and where it has fully tipped (mm) | gains → `RobotConfig.h`; positions → `X_CREEP`, `X_TIP` in `Sequence.h` |
 | 3 | `Slide_PID_Tune` | slide gains | `SLIDE_K*` in `RobotConfig.h` (`g` prints them) |
 | 4 | editor → **Calibrate servos** (or `Servo_Offset_Cal`) | the 3 servo pulse widths at the reference pose (+ optional scale check) | editor → **Apply** → Save (or `*_CAL_US` in `RobotConfig.h`) |
-| 5 | `tools/sequence_editor.html` | poses in the twin, then by eye on the real robot (Connect robot, Step & move tab) | `Sequence.h` |
+| 5 | `tools/sequence_editor.html` | poses in the twin, then by eye on the real robot (Connect robot, Step tab) | `Sequence.h` |
 
 `_old/Motor_Pin_Test` is the retired pin finder from the old DIR+PWM driver. Don't use it.
 
@@ -35,7 +35,7 @@ See its README. Paste the `g` output into the `SLIDE_K*` lines of `RobotConfig.h
 
 ## 4. Servo offsets: editor or `Servo_Offset_Cal`
 
-**Easiest: the sequence editor.** With `Robot_Controller_V2_1` uploaded: editor → **Connect robot** (top right, with "hold still and wait" picked under the twin), then the **Calibrate servos** tab. It walks through the same steps as below with buttons (limp, power, −5 / −1 / +1 / +5 µs) and shows what **Apply** will change before you press it.
+**Easiest: the sequence editor.** With `Robot_Controller_V2_1` uploaded: editor → **Connect robot** (top right; ▾ next to it = "hold still and wait"), then the **Calibrate servos** tab. It walks through the same steps as below with buttons (limp, power, −5 / −1 / +1 / +5 µs) and shows what **Apply** will change before you press it.
 
 **Without the editor:** the `Servo_Offset_Cal` sketch and the Serial Monitor, as below. Full command list, scale check and troubleshooting: [`Servo_Offset_Cal/README.md`](Servo_Offset_Cal/README.md).
 
@@ -70,7 +70,7 @@ Put a phone level on an arm post and use `a+` / `a-` (both arm servos together) 
 
 ## 5. Poses: twin first, then on the robot
 
-Set poses in the twin first (no robot needed): see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). Then upload `Robot_Controller_V2_1` (no settings to change), close the serial monitor, open the editor → **Connect robot** (top right). Select a step and nudge its value boxes with ↑ ↓ (Step & move tab), or use the Pose sliders tab: the real arm and scoop follow. Then Save the file and re-upload. **Move robot** next to an angle (Angles & values) moves the robot to it; while connected the grey ghost in the twin is the real robot.
+Set poses in the twin first (no robot needed): see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). Then upload `Robot_Controller_V2_1` (no settings to change), close the serial monitor, open the editor → **Connect robot** (top right). Select a step and nudge its value boxes with ↑ ↓ (Step tab), or use the pose sliders at the top of Angles & values: the real arm and scoop follow. Then Save the file and re-upload. **Move robot** next to an angle (Angles & values) moves the robot to it; while connected the grey ghost in the twin is the real robot.
 
 ---
 

@@ -15,19 +15,20 @@ The competition program for the V2 robot (servo intake, goBILDA slide motor). It
 
 | | Step | What happens | Ends when |
 |---|---|---|---|
-| Intake (V2) | `SCOOP_DOWN` | scoop jumps to `S_DOWN` | 500 ms |
-| | `ARM_DOWN` | arm jumps to `A_DOWN` | 500 ms |
-| | `SWEEP_UP` | arm lifts to `A_PEAK` (35 °/s) while the scoop turns `S_DOWN` → `S_SCOOP` (91.9 °/s, about 2 s) | 1000 ms |
-| | `SWEEP_DOWN` | arm drops to `A_SCOOP` (42.4 °/s); the scoop's move carries on | arm arrived |
-| | `PICKUP` | scoop to `S_PICKUP` (lip up) | 1000 ms (V1 used 100) |
-| Transfer (V1) | `LIFT` | arm lifts to `A_TRANSFER` over 1 s, scoop still at pickup | 500 ms in |
-| | `CARRY` | scoop to the carry angle `S_CARRY` while the arm keeps lifting | arm 90% up |
-| | `POUR` | scoop tips to `S_POUR` over the bucket | done |
-| | `VIBRATE` | scoop shakes ±`VIBRATE_DEG` at 10 Hz | 1000 ms |
-| Outtake | `EXTEND` | arm to `A_MOVE` while the slides run at `SLIDE_FAST` to `X_CREEP` | reaches `X_CREEP` |
-| | `CREEP` | slides carry on at `SLIDE_CREEP` (no stop in between) so the bucket tips slowly | reaches `X_TIP` |
-| | `TIP_HOLD` | hold while the rocks fall | 300 ms |
-| | `RETRACT` | slides back (to 200 mm now) at `SLIDE_RETRACT_SPEED` / `SLIDE_RETRACT_ACCEL` | arrived |
+| Intake (V2) | `SCOOP_DOWN` | scoop to `S_DOWN` at `SCOOP_FAST` | 300 ms |
+| | `ARM_DOWN` | arm to `A_DOWN` at `ARM_FAST` | 500 ms |
+| | `SWEEP_UP` | arm lifts to `A_PEAK` (62.1 °/s) while the scoop turns `S_DOWN` → `S_SCOOP` (156.1 °/s) | arm arrived |
+| | `SWEEP_DOWN` | arm drops to `A_SCOOP` (75 °/s); the scoop's move carries on | all arrived (arm **and** the scoop's move) |
+| | `WAIT` | nothing moves | 120 ms |
+| | `PICKUP` | scoop to `S_PICKUP` (lip up) | 260 ms (V1 used 100) |
+| Transfer (V1) | `LIFT` | arm lifts to `A_TRANSFER` (222.1 °/s), scoop still at pickup | 100 ms in |
+| | `CARRY` | scoop to the carry angle `S_CARRY` (210.6 °/s) while the arm keeps lifting | arm arrived |
+| | `POUR` | scoop tips to `S_POUR` over the bucket | all arrived |
+| | `VIBRATE` | scoop shakes ±`VIBRATE_DEG` at 10 Hz | 590 ms |
+| Outtake | `EXTEND` | arm to `A_MOVE`, scoop to `S_DOWN`, slides at `SLIDE_FAST` to `X_CREEP` | all arrived |
+| | `CREEP` | slides carry on at `SLIDE_CREEP` (no stop in between) so the bucket tips slowly | all arrived (`X_TIP` is past the end stop now: see the editor's warning) |
+| | `TIP_HOLD` | hold while the rocks fall | 1500 ms |
+| | `RETRACT` | slides back to 200 mm at `SLIDE_RETRACT_SPEED` / `_ACCEL` / `_DECEL` | all arrived |
 
 <table><tr>
 <td><img src="img/seq_SWEEP.png" width="230" alt="Twin: end of the sweep, scoop flat on the floor"><br>SWEEP_DOWN (end of the sweep)</td>
@@ -45,9 +46,11 @@ Pictures come from the twin with CAD estimates; the twin's angles are only exact
 
 **Rules for a row** (also in the comments of `Sequence.h`):
 - ARM / SCOOP: an angle name, a number, or `HOLD`. `HOLD` means "don't touch it": a move started in an earlier step keeps going. That is how steps overlap (the arm keeps lifting through `CARRY`, the arm clears during `EXTEND`).
-- Every move is a motion profile. Each ARM / SCOOP has a speed (deg/s, 0 = `ARM_SPEED` / `SCOOP_SPEED`; `ARM_FAST` / `SCOOP_FAST` = the servo's own top speed, the old INSTANT) with one accel per servo. A new target takes over a running move smoothly; HOLD lets it carry on. SLIDE picks a named speed (`SLIDE_FAST`, `SLIDE_CREEP`, `SLIDE_RETRACT_SPEED`); accel is `SLIDE_ACCEL`, or `SLIDE_RETRACT_ACCEL` with the retract speed. (The MOVE and ARM VIA columns were removed 16 Oct; SWEEP became SWEEP_UP + SWEEP_DOWN.)
+- Every move is a motion profile. Each ARM / SCOOP has a speed (deg/s, 0 = `ARM_SPEED` / `SCOOP_SPEED`; `ARM_FAST` / `SCOOP_FAST` = the servo's own top speed, the old INSTANT), and each axis speeds up at its `_ACCEL` and slows down at its `_DECEL` (`ARM_`, `SCOOP_`, `SLIDE_`, `SLIDE_RETRACT_`). A new target takes over a running move smoothly; HOLD lets it carry on. SLIDE picks a named speed (`SLIDE_FAST`, `SLIDE_CREEP`, `SLIDE_RETRACT_SPEED`); it uses `SLIDE_ACCEL` / `SLIDE_DECEL`, or `SLIDE_RETRACT_ACCEL` / `SLIDE_RETRACT_DECEL` with the retract speed. (The MOVE and ARM VIA columns were removed 16 Oct; SWEEP became SWEEP_UP + SWEEP_DOWN.)
 - SLIDE: mm from fully in, or `HOLD`. Two slide rows in a row that keep going the same way **blend**: the first slows to the second's speed instead of stopping.
-- NEXT WHEN: `WAIT_MS(ms)`, `WAIT_ARRIVED(ms)` (everything this step moved), `WAIT_ARM_ARRIVED(ms)` / `WAIT_SCOOP_ARRIVED(ms)` / `WAIT_SLIDE_ARRIVED(ms)` (just that axis), `WAIT_ARM(%)`, `WAIT_SCOOP(%)`, `WAIT_SLIDE(%)`.
+- NEXT WHEN: `WAIT_MS(ms)`, `WAIT_ARRIVED(ms)` (**every** axis has stopped: arm, scoop, and the slides once they've been used this run, including moves started in earlier steps), `WAIT_ARM_ARRIVED(ms)` / `WAIT_SCOOP_ARRIVED(ms)` / `WAIT_SLIDE_ARRIVED(ms)` (just that axis), `WAIT_ARM(%)`, `WAIT_SCOOP(%)`, `WAIT_SLIDE(%)`. For the arrived ones, `+ms` waits that long after arriving and `-ms` moves on that long *before* arriving (from the profile's planned finish time), so the next move blends in. (Before 16 Oct, `WAIT_ARRIVED` only waited for the axes the step itself moved.)
+- A.ACC% A.DEC% S.ACC% S.DEC% (last four, optional): this row's arm / scoop move speeds up / slows down at that % of `ARM_` / `SCOOP_` `ACCEL` / `DECEL` (1–255, 100 or left out = those). Only that row's move; HOLD axes ignore it.
+- OR AFTER (optional, before the % columns): a time limit in ms. The step moves on after it even if NEXT WHEN never comes true, and logs `E,STEP_LIMIT,<step>`. `0` (or left out) = no limit. It scales with `k` like the other times.
 
 ## Editing and tuning
 
@@ -56,9 +59,9 @@ Pictures come from the twin with CAD estimates; the twin's angles are only exact
 3. First runs on the robot: set `SPEED_PCT_AT_BOOT = 25` (slow motion) and/or `STEP_MODE_AT_BOOT = true` (pauses after every step, `n` = next), or use the console commands below.
 4. Log runs with `python tools/capture_log.py` and open the `.html` it writes. **Never done it?** [`LOGGING.md`](LOGGING.md) walks through installing Python and pyserial, then logging a run.
 
-**Tune it in the editor first**, then confirm on the robot: see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). In the Step & move tab, the ↑ ↓ keys in a step's value box nudge a pose live (the twin, and the robot when connected, follow). On the timeline, drag a ◆ up/down for the pose and sideways for a servo move's speed. The Pose sliders tab still works as before.
+**Tune it in the editor first**, then confirm on the robot: see [`SEQUENCE_TUNING.md`](../SEQUENCE_TUNING.md). In the Step tab, the ↑ ↓ keys in a step's value box nudge a pose live (the twin, and the robot when connected, follow). On the timeline, drag a ◆ up/down for the pose and sideways for a servo move's speed. The pose sliders are at the top of Angles & values.
 
-**Live link** (check poses by eye on the real robot): upload as it is, close the serial monitor, battery on, editor → **Connect robot** (top right; "hold still and wait" picked under the twin). The same sliders now move the robot. **Robot follows timeline** (under the twin) makes the robot copy the twin while you scrub or play, so edits can be tried without uploading (`P` command below). Save and re-upload for the real run.
+**Live link** (check poses by eye on the real robot): upload as it is, close the serial monitor, battery on, editor → **Connect robot** (top right; ▾ next to it = "hold still and wait"). The same sliders now move the robot. On the timeline, Drives **Robot · live** makes the robot copy the twin while you scrub or play, so edits can be tried without uploading (`P` command below); **Robot · uploaded** runs this program's own copy (`r <step>`). Every run is saved to `logs/`. Save and re-upload for the real run.
 
 **Bench handshake:** at every power-up the robot waits `BENCH_WINDOW_MS` (150 ms) for a computer to send `b`. The editor sends it when you connect with **Hold still**, so you never need to change `RUN_MODE`. With nothing attached (competition) it runs as normal. The 150 ms is added to every run.
 
@@ -77,15 +80,16 @@ Pictures come from the twin with CAD estimates; the twin's angles are only exact
 `x` stop · `g` run · `r <n>` run from step n · `t` step mode on/off · `n` next step · `k <pct>` speed % · `l` list steps · `p` config ·
 `A <deg>` arm · `S <deg>` scoop · `Q` pose · `o <mm> [mm/s]` slide move · `j <pwm> <ms>` slide jog · `z` zero slide · `c` coast · `v` vibrate ·
 `b` bench: stop and wait for commands · servo calibration: `U <1-3> <µs>` raw pulse, `L <1-3>` limp (`L 0` = all), `M` back to degrees (holds the reference pose)
-`P <arm> <scoop> [mm] [mm/s] [vib]` follow the editor's timeline (sent ~25 times a second by **Robot follows timeline**): servos straight to the angles at their own speed, slides re-planned toward mm arriving at mm/s (mm < 0 = leave the slides), vib > 0 = shake ±vib°. No reply line. `M <arm> <scoop>` = back to degrees holding that pose.
+`P <arm> <scoop> [mm] [mm/s] [vib]` follow the editor's timeline (sent ~25 times a second by the editor's Drives: **Robot · live**): servos straight to the angles at their own speed, slides re-planned toward mm arriving at mm/s (mm < 0 = leave the slides), vib > 0 = shake ±vib°. No reply line. `M <arm> <scoop>` = back to degrees holding that pose.
 
 Jog commands work in bench mode (`b`, or `RUN_CONSOLE`), while `WAIT_FOR_GO` is waiting, and after a run has finished. During a run only `x`, `t`, `n` and `b` are accepted.
 
 ## Safety and events
 
-- **Slide stall** (pushing ≥ 90 PWM, slower than 50 counts/s for 200 ms) or **timeout** (profile time + 1.5 s): runs the `RETRACT` step once, then stops. Events `STALL`, `TIMEOUT`, `FALLBACK`.
+- **Slide stall** (pushing ≥ 90 PWM, slower than 50 counts/s for 200 ms) or **timeout** (profile time + 1.5 s): runs the `RETRACT` step once, then stops. Events `STALL`, `TIMEOUT`, `FALLBACK`. Watched until the slide move arrives, even after the row that started it has ended. Outside a run (console jogs, the editor's hand jog) a stall just cuts the motor (`STALL_CUT`).
 - **Wiring check**: driving one way but running away fast the other → motor off, `DIR_MISMATCH`.
 - `SETTLED_SHORT`: the slide stopped close to (but not at) its target and the step moved on. Tune `SLIDE_KG` / `SLIDE_KS`.
+- `STEP_LIMIT,<step>`: that step's OR AFTER time ran out before its NEXT WHEN came true, so it moved on.
 - 60 s watchdog, I2C timeout recovery, `NO_SERVO_DRIVER` (won't run the slides with no servo board).
 - DONE: motor off, servos hold, LED on.
 
@@ -97,4 +101,4 @@ Edit `SLIDE_STEP_UP` in `RobotConfig.h` (and the spec in `ROBOT_SPECS.md`). Slid
 
 Same `D` columns as before so `tools/run_viewer.html` still works: arm logged as 0–1000 (650 = vertical, 5 per degree), scoop as µs-equivalent (2300 = 0°, 6.667 per degree), slides in encoder counts. `#STATES` carries the step names, `S` lines mark each step, `#CFG` lists calibration and gains.
 
-Flash 28.9 KB of 30 KB, RAM 1.16 KB of 2 KB (no Adafruit servo library: a 30-line PCA9685 driver with the same 50 Hz setup).
+Flash 28,840 B of 30,720 B, RAM 1,140 B of 2 KB with avr-gcc 7.3 and a stand-in Encoder library (16 Oct); the IDE showed about 1 KB more flash than this build, so check its number after uploading (no Adafruit servo library: a 30-line PCA9685 driver with the same 50 Hz setup).
