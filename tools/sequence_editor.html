@@ -148,6 +148,7 @@ body.rowresize, body.rowresize * { cursor: row-resize !important; user-select: n
 .twin { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .stage { position: relative; flex: 1 1 auto; min-height: 60px; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: var(--r) var(--r) 0 0; }
+.hud[hidden] { display: none !important; }
 .hud { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; max-width: calc(100% - 200px); }
 .hud .stepname { font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: 0.05em; text-transform: uppercase; background: var(--panel); padding: 1px 8px; border-radius: 4px; border: 1px solid var(--line); align-self: flex-start; }
 .hud .vals { font-family: var(--f-data); font-size: 11.5px; background: var(--panel); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 2px 12px; }
@@ -224,6 +225,17 @@ details > summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 .insp-head { display: flex; align-items: center; gap: 6px; }
 .insp-head input { font-weight: 600; font-family: var(--f-data); flex: 1; min-width: 0; }
 .insp-head button { padding: 2px 9px; }
+.flagbtn { font-size: 12px; white-space: nowrap; color: var(--ink-2); padding: 2px 6px !important; }
+.flagbtn[aria-pressed="true"] { color: #fff; font-weight: 600; background: var(--muted); border-color: var(--muted); }
+.flagbtn.flagstop[aria-pressed="true"] { background: var(--pour); border-color: var(--pour); }
+.story.off { opacity: 0.75; border-style: dashed; }
+.flagnote { font-weight: 600; color: var(--pour); }
+table.steps tr.off td:not(.flagcell):not(.acts) { opacity: 0.45; }
+table.steps td.flagcell select { font-size: 12px; }
+table.steps td.limcell { white-space: nowrap; }
+table.steps td.limcell input[type="checkbox"] { width: auto; margin: 0 4px 0 0; vertical-align: middle; }
+.testchip { display: inline-block; flex: none; padding: 2px 8px; border-radius: 10px; background: var(--pour); color: #fff; font-size: 11.5px; font-weight: 600; cursor: pointer; border: none; white-space: nowrap; }
+.testchip[hidden] { display: none; }
 .insp-head input { padding: 3px 6px; }
 .insp-head .sp { flex: 0 0 6px; }
 .story { font-size: 12.5px; line-height: 1.4; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 8px; }
@@ -246,8 +258,9 @@ table.steps .adcell input { width: 50px; font-size: 11.5px; padding: 1px 3px; }
 .ictl { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .ictl .pair { display: flex; gap: 6px; min-width: 0; align-items: center; }
 .ictl .pair select { min-width: 0; padding: 3px 6px; }
-.ictl .pair input[type="number"] { width: 64px; }
-.ictl .pair input.lim { width: 58px; }
+.ictl .pair input[type="number"] { width: 58px; }
+.ictl .pair input.lim { width: 52px; }
+.ictl .pair .lab input[type="checkbox"] { margin: 0 3px 0 0; vertical-align: -2px; }
 .ictl .pair > .lab { font-family: var(--f-display); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 select.over { border-color: var(--level); background: color-mix(in srgb, var(--level) 14%, transparent); }
 .choices { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
@@ -276,7 +289,7 @@ select.over { border-color: var(--level); background: color-mix(in srgb, var(--l
 .seg .seglab { font-size: 11.5px; color: var(--muted); padding: 0 8px; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--f-display); font-weight: 600; }
 .tnow { margin-left: auto; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
 .tl-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; min-height: 18px; }
-#tlHelp, #keyHint { flex: 1 1 200px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line either way: the timeline must not move when the hint changes */
+#tlHelp, #keyHint { flex: 1 1 80px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line either way: the timeline must not move when the hint changes */
 #keyHint:empty { display: none; }
 #keyHint:not(:empty) + #tlHelp { display: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11.5px; color: var(--ink-2); }
@@ -362,6 +375,7 @@ table.steps td.limcell input { width: 70px; }
   <div class="top-in">
     <div class="brand"><h1>Dover sequence</h1><span id="fileChip" class="filechip">built-in snapshot</span></div>
     <div class="total" title="How long the whole sequence takes in the editor's model"><span class="lab">Predicted run</span><span id="totalTime" class="big">–</span></div>
+
     <button id="btnIssues" class="issues" aria-haspopup="dialog" aria-expanded="false" title="Problems the editor can see in the sequence: click one to go to it">Issues</button>
     <div class="btns" role="group" aria-label="File">
       <button id="btnOpenDir" title="Pick the METR2800-GROUP1 folder (or Robot_Controller_V2_1): opens Sequence.h and RobotConfig.h, and Save writes back to them">Open robot folder</button>
@@ -410,6 +424,7 @@ table.steps td.limcell input { width: 70px; }
         <span><i class="sq" style="background:var(--pour)"></i>pours</span>
         <span>◆ a move ends (drag it) · ×2 = name used by 2 steps</span>
       </div>
+      <button id="testChip" class="testchip" hidden title="Test flags are set (skip / stop after): click to go to them. Clear them before the competition."></button>
       <span id="keyHint" class="tl-hint" aria-live="polite"></span>
       <span id="tlHelp" class="tl-hint" title="Click / drag = move the playhead, then hold ← / → to play backwards / forwards at the play speed · drag a ◆: up/down = position (keeps its time), sideways = when it arrives · drag a step's right edge = how long it takes · click a ◆, then arrow keys · Esc · Ctrl+Z">Click = playhead, then hold ← → to play · drag a ◆: up/down = position, sideways = when it arrives · drag a step's right edge = how long it takes · click a ◆, then arrow keys · Esc · Ctrl+Z</span>
       <div class="runbox" id="runBox">
@@ -427,7 +442,7 @@ table.steps td.limcell input { width: 70px; }
     <section class="panel twin" aria-label="3D twin and robot link">
       <div class="stage locked" id="stage">
         <canvas id="twin3d" aria-label="3D model of the robot at the current time"></canvas>
-        <div class="hud">
+        <div class="hud" hidden aria-hidden="true">   <!-- nothing drawn over the 3D view (Tinzen): the timeline, Step tab and pose box show all of it -->
           <div id="hudStep" class="stepname">–</div>
           <div id="hudVals" class="vals"></div>
           <div id="hudNote" class="vals hudnote" hidden></div>
@@ -436,10 +451,10 @@ table.steps td.limcell input { width: 70px; }
         <div class="stagectl">
           <select id="viewSel" aria-label="View"><option value="robot">Robot</option><option value="side">Side</option><option value="track">Field</option></select>
           <label class="tilt" title="Degrees below the CAD slide angle (32°). 14.9 puts the bucket on the hopper rim. Twin only: measure the real angle.">tilt° <input id="tiltIn" class="num" type="number" step="0.5" aria-label="Slide tilt, degrees (twin only)"></label>
-          <button id="btnLock" class="tog" aria-pressed="true" title="While locked, dragging or scrolling on the 3D view does nothing (the View menu still works)">Lock view</button>
+          <button id="revZoom" class="tog" aria-pressed="false" hidden title="Scroll the other way to zoom">Reverse zoom</button>
+          <button id="btnLock" class="tog" aria-pressed="true" title="While locked, dragging or scrolling on the 3D view does nothing (the View menu still works). Unlocked: scroll = zoom at the cursor, middle-drag = pan, Shift + middle-drag = orbit, double-click = fit; trackpad: left-drag orbits, Shift + left-drag pans.">Lock view</button>
         </div>
-        <div id="lockMsg" class="lockmsg" hidden>View locked: click <b>View locked</b> to move it</div>
-        <div id="camHelp" class="camhelp" hidden><span><b>Scroll</b> zoom at cursor</span><span><b>Middle-drag</b> pan</span><span><b>Shift + middle-drag</b> orbit</span><span><b>Double-click</b> fit</span><span>Trackpad: left-drag orbits, Shift + left-drag pans</span><button id="revZoom" class="tog" aria-pressed="false">Reverse zoom</button></div>
+        <div id="lockMsg" hidden></div><div id="camHelp" hidden></div>
       </div>
       <div class="robotbar" aria-label="Robot link">
         <div class="rb-row">
@@ -498,8 +513,9 @@ table.steps td.limcell input { width: 70px; }
           <p class="hint"><b>Shared names.</b> A name (A_PEAK, S_DOWN…) can be used by several steps, and changing it changes all of them. The Step tab and the ◆ show <b>×2</b> when that's the case; <b>Change this step only</b> gives the step its own copy.</p>
           <p class="hint"><b>HOLD</b> = that axis keeps doing what it was doing, so a move started in an earlier step keeps going. Every move is a smooth profile; a new target takes over a running move smoothly.</p>
           <p class="hint"><b>Next step</b>: after ms · all arrived ± ms (<b>every</b> axis has stopped: arm, scoop and slides, including moves started in earlier steps) · arm / scoop / slides arrived ± ms (that axis only) · arm / scoop / slides at % of its move. <b>+ ms</b> waits that long after arriving; <b>− ms</b> goes that long <i>before</i> it arrives (by the plan), so the next move starts early and blends in. Two slide steps in a row going the same way blend without stopping.</p>
-          <p class="hint"><b>Or after</b> (ms, 0 = off): the step moves on after this long even if its condition never comes true (a stuck slide, a stalled move). The robot logs <span class="mono">E,STEP_LIMIT</span>; the timeline marks the step ⏱.</p>
+          <p class="hint"><b>Or after</b> (tick it; off by default): the step moves on after this long even if its condition never comes true (a stuck slide, a stalled move). The robot logs <span class="mono">E,STEP_LIMIT</span>; the timeline marks the step ⏱.</p>
           <p class="hint"><b>Speeds</b>: servos in °/s (default ARM_SPEED / SCOOP_SPEED; ARM_FAST / SCOOP_FAST = the servo's own top speed). Slides pick a named speed; SLIDE_RETRACT_SPEED uses SLIDE_RETRACT_ACCEL / _DECEL. Every axis has an <b>ACCEL</b> (speeding up) and a <b>DECEL</b> (slowing down) in Angles &amp; values. For <b>one</b> servo move, click <b>a/d</b> next to its speed in the Step tab (or the acc / dec boxes in the table): a % of the axis's values (100 = those).</p>
+          <p class="hint"><b>Test flags</b>: <b>⊘ Skip</b> a step (it stays in the file and on the timeline as ⊘, but doesn't run) or <b>⏹ Stop</b> after a step (the robot then goes back to the start pose; the rest is greyed). Step tab, the table's Run menu, or right-click a step on the timeline. Saved in Sequence.h, so the uploaded robot does it too. The red <b>TEST</b> chip on the timeline means one is set.</p>
           <p class="hint"><b>Slides by hand</b> (Angles &amp; values, connected): hold <b>◀ In</b> / <b>Out ▶</b> to drive them gently, <b>Zero here</b> makes where they are 0 mm, and letting go of the SLIDES slider sends them there.</p>
           <p class="hint"><b>Drives</b>: <b>Twin only</b> moves nothing real. <b>Robot · live</b> streams the twin's pose 25 times a second (timing comes from the editor's model). <b>Robot · uploaded</b> runs the robot's own copy; <b>Pause each step</b> stops it after every step and <b>Continue</b> runs the next.</p>
         </div>
@@ -517,7 +533,7 @@ table.steps td.limcell input { width: 70px; }
         </div>
         <div class="vgroup">
           <h3>Safety and the robot link</h3>
-          <p class="hint"><b>■ Stop</b> (top right, or X) stops playback, the robot's run, the slides (they go loose) and the shaking. <b>Limp</b> lets everything go so you can move it by hand. <b>↺ Reset</b> sends the robot to the IDLE pose with the slides in.</p>
+          <p class="hint"><b>■ Stop</b> (top right, or X) stops playback, the robot's run, the slides (they go loose) and the shaking. <b>Limp</b> lets everything go so you can move it by hand. <b>↺ Reset</b> sends the robot to the IDLE pose with the slides in, and puts <b>Drives</b> back to what you last picked (■ Stop and Limp drop Robot · live to Twin only).</p>
           <p class="hint">When you press <b>Connect robot</b> the robot holds still and waits (▾ next to it changes that). You never need to change <span class="mono">RUN_MODE</span> in the code. With no computer attached it runs as normal.</p>
           <p class="hint"><b>3D view</b>: locked by default so a stray drag doesn't spin it. Unlocked: scroll zooms at the cursor, middle-drag pans, Shift + middle-drag orbits, double-click fits.</p>
           <p class="hint">Without the folder (other browsers): edit, then <b>⋯</b> → Download or Copy, and replace <span class="mono">Sequence.h</span>. Tell your agent if you did, so the files stay in sync. Full walkthrough: <span class="mono">SEQUENCE_TUNING.md</span>. The twin's angles are only as good as the servo calibration (<b>Calibrate servos</b>).</p>
@@ -558,17 +574,17 @@ table.steps td.limcell input { width: 70px; }
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -31.6f;  // power-on pose (V2 940)
 const float A_DOWN     =  100.3f;  // V2 200
-const float A_PEAK     =   67.3f;  // sweep lifts to here halfway (V2 350)
+const float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)
 const float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)
 const float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)
 const float A_MOVE     =   35.9f;  // clear of the slides (V2 500)
 
 // ---- SCOOP ANGLES (deg) -----------------------------------------------------
 const float S_START    =    5.4f;  // power-on pose (V2 2300 us)
-const float S_DOWN     = -252.0f;  // V2 700 us
+const float S_DOWN     = -250.0f;  // V2 700 us
 const float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 1900 us)
 const float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)
-const float S_CARRY    =  -146.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
+const float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
 const float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
 
 // ---- SLIDE POSITIONS (mm) ---------------------------------------------------
@@ -611,24 +627,26 @@ const int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1
 // OR AFTER: ms after which the step ends anyway (something stuck). 0 = no limit.
 // A.ACC% A.DEC% / S.ACC% S.DEC%: this row's arm / scoop move speeds up / slows down at that % of
 //            ARM_ / SCOOP_ ACCEL and DECEL (100 = those; 1-255). Only that one move.
+// FLAG (testing): STEP_RUN normal | STEP_SKIP this row doesn't run | STEP_STOP the run ends after this row
+//            and the robot goes back to the start pose. Leave every row on STEP_RUN for the competition.
 // HOLD = that axis keeps doing what it was doing: a move still running when its step ends keeps going.
 const Step SEQUENCE[] PROGMEM = {
-//  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC%
-  { "IDLE",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },
-  { "SCOOP_DOWN",  HOLD,        0,         S_DOWN,    SCOOP_FAST, HOLD,     0,                   0,           WAIT_MS(300),          0,       100,   100,   100,   100    },  // V2: scoop first
-  { "ARM_DOWN",    A_DOWN,      ARM_FAST,  HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(500),          0,       100,   100,   100,   100    },  // V2
-  { "SWEEP_UP",    A_PEAK,      62.1,      S_SCOOP,   156.1,      HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100    },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s
-  { "SWEEP_DOWN",  A_SCOOP,     75,        HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },  // second half: arm drops, the scoop's move carries on
-  { "WAIT",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(120),          0,       100,   100,   100,   100    },
-  { "PICKUP",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_MS(260),          0,       100,   100,   100,   100    },  // V2 (V1 used 100 ms)
-  { "LIFT",        A_TRANSFER,  222.1,     HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(100),          0,       100,   100,   100,   100    },  // V1: 1 s lift, scoop still at pickup
-  { "CARRY",       HOLD,        0,         S_CARRY,   210.6,      HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100    },  // V1: carry angle until nearly up
-  { "POUR",        HOLD,        0,         S_POUR,    0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },  // V1: tip into the bucket
-  { "VIBRATE",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(590),          0,       100,   100,   100,   100    },  // V1: shake the rest out
-  { "EXTEND",      A_MOVE,      0,         S_DOWN,    0,          X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },  // arm clears while slides go
-  { "CREEP",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },  // blends from fast, no stop
-  { "TIP_HOLD",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(1500),         0,       100,   100,   100,   100    },  // let the rocks fall
-  { "RETRACT",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100    },  // back in, fast
+//  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG
+  { "IDLE",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },
+  { "SCOOP_DOWN",  HOLD,        0,         S_DOWN,    430,        HOLD,     0,                   0,           WAIT_MS(300),          0,       100,   100,   100,   100,   STEP_RUN  },  // V2: scoop first
+  { "ARM_DOWN",    A_DOWN,      358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2
+  { "SWEEP_UP",    A_PEAK,      185.6,     S_SCOOP,   160.3,      HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s
+  { "SWEEP_DOWN",  A_SCOOP,     84.6,      HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // second half: arm drops, the scoop's move carries on
+  { "WAIT",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(0),            0,       100,   100,   100,   100,   STEP_RUN  },
+  { "PICKUP",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_MS(260),          0,       100,   100,   100,   100,   STEP_RUN  },  // V2 (V1 used 100 ms)
+  { "LIFT",        A_TRANSFER,  358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(100),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup
+  { "CARRY",       HOLD,        0,         S_CARRY,   95.2,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V1: carry angle until nearly up
+  { "POUR",        HOLD,        0,         S_POUR,    430,        HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // V1: tip into the bucket
+  { "VIBRATE",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(700),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out
+  { "EXTEND",      A_MOVE,      0,         S_DOWN,    429.1,      X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // arm clears while slides go
+  { "CREEP",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop
+  { "TIP_HOLD",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(1500),         0,       100,   100,   100,   100,   STEP_RUN  },  // let the rocks fall
+  { "RETRACT",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // back in, fast
 };
 </script>
 <script type="text/plain" id="snap-cfg">// =============================================================================
@@ -771,7 +789,8 @@ function parseHeader(text) {
       const w = parts[7].match(/(WAIT_\w+)\s*\(\s*(-?[\w.]+)\s*\)/);
       steps.push({ name: m[1], arm: parts[0], armV: parts[1], scoop: parts[2], scoopV: parts[3], slide: parts[4], speed: parts[5],
                    vib: parts[6], waitType: w ? w[1] : "WAIT_MS", waitVal: w ? w[2] : "0", limit: parts[8] !== undefined ? parts[8] : "0",
-                   armAcc: parts[9] ?? "100", armDec: parts[10] ?? "100", scoopAcc: parts[11] ?? "100", scoopDec: parts[12] ?? "100", note: (m[3] || "").trim() });
+                   armAcc: parts[9] ?? "100", armDec: parts[10] ?? "100", scoopAcc: parts[11] ?? "100", scoopDec: parts[12] ?? "100",
+                   skip: /STEP_SKIP|^\s*[13]\s*$/.test(parts[13] || ""), stop: /STEP_STOP|^\s*[23]\s*$/.test(parts[13] || ""), note: (m[3] || "").trim() });
     }
   }
   return { lines, consts, steps, tStart, tEnd, oldFormat };
@@ -831,15 +850,16 @@ function writeHeader(doc, consts, steps) {
   }
   return out.join("\n");
 }
-const ROW_W = [14, 12, 10, 10, 11, 9, 20, 12, 22, 8, 6, 6, 6, 6];
-const ROW_HEAD = ["STEP", "ARM", "deg/s", "SCOOP", "deg/s", "SLIDE", "SLIDE mm/s", "VIBRATE", "NEXT WHEN", "OR AFTER", "A.ACC%", "A.DEC%", "S.ACC%", "S.DEC%"];
+const ROW_W = [14, 12, 10, 10, 11, 9, 20, 12, 22, 8, 6, 6, 6, 6, 9];
+const ROW_HEAD = ["STEP", "ARM", "deg/s", "SCOOP", "deg/s", "SLIDE", "SLIDE mm/s", "VIBRATE", "NEXT WHEN", "OR AFTER", "A.ACC%", "A.DEC%", "S.ACC%", "S.DEC%", "FLAG"];
+const flagTxt = (s) => (s.skip && s.stop ? "STEP_SKIP | STEP_STOP" : s.skip ? "STEP_SKIP" : s.stop ? "STEP_STOP" : "STEP_RUN");
 const tableHead = () => ("//  " + ROW_HEAD.map((c, i) => c.padEnd(ROW_W[i] + 1)).join("")).trimEnd();
 const pctTxt = (v) => String(v ?? "100").trim() || "100";
 function tableRows(steps) {
   const w = ROW_W;
   return steps.map((s) => {
     const cells = [`"${s.name}",`, s.arm + ",", s.armV + ",", s.scoop + ",", s.scoopV + ",", s.slide + ",", s.speed + ",", s.vib + ",", `${s.waitType}(${s.waitVal}),`, (String(s.limit ?? "0").trim() || "0") + ",",
-      pctTxt(s.armAcc) + ",", pctTxt(s.armDec) + ",", pctTxt(s.scoopAcc) + ",", pctTxt(s.scoopDec)];
+      pctTxt(s.armAcc) + ",", pctTxt(s.armDec) + ",", pctTxt(s.scoopAcc) + ",", pctTxt(s.scoopDec) + ",", flagTxt(s)];
     let line = "  { " + cells.map((c, i) => i < cells.length - 1 ? c.padEnd(w[i] + 1) : c.padEnd(w[i])).join("") + " },";
     if (s.note) line += "  // " + s.note;
     return line;
@@ -1007,9 +1027,12 @@ class Axis {   // a servo: every move is a profile (mirrors ServoAxis.cpp)
   out(t) { if (!this.vib) return this.cmd; const k = Math.floor((t - this.vibT0) * 1000 / this.vibHalf); return this.clamp(this.cmd + (k % 2 === 0 ? -this.vib : this.vib)); }
 }
 const servoMax = (ax) => cfgv("SERVO_NATIVE_DEG_S") / (ax === "arm" ? (cfgv("ARM_GEAR_RATIO") || 1.2) : 1);   // the servo's own top speed
+// edits may go past the top speed (warned, not stopped); this is only the solvers' search bound
+const speedBound = (ax) => 5 * servoMax(ax);
+const overMsg = (ax) => `over the ${ax}'s top speed (${fmtV(Math.round(servoMax(ax) * 10) / 10)}°/s): the real servo gets there later than the twin shows`;
 
 let SIM = null;
-function simulate() {
+function simulate(opts = {}) {   // opts.noStop: ignore STEP_STOP (to draw the steps after it, greyed)
   const C = constMap(), V = (k, d) => (C[k] !== undefined ? C[k] : d);
   const errs = [];
   const rows = M.steps.map((s, i) => {
@@ -1024,6 +1047,7 @@ function simulate() {
     const lim = resolve(s.limit ?? "0", "num");
     r.waitType = s.waitType; r.waitVal = wv || 0; r.name = s.name; r.limit = lim > 0 ? lim : 0;
     for (const f of AD_FIELDS) r[f] = pctK(s[f]);
+    r.skip = !!s.skip; r.stop = !!s.stop && !s.skip && !opts.noStop;   // a skipped row never runs, so it can't stop either
     return r;
   });
   const ARM_SPEED = V("ARM_SPEED", 300), ARM_ACCEL = V("ARM_ACCEL", 1600), ARM_DECEL = V("ARM_DECEL", ARM_ACCEL);
@@ -1042,6 +1066,9 @@ function simulate() {
   const closeK = (ax, cut) => { const k = openK[ax]; if (k) { k.tEnd = t; k.cut = !!cut; openK[ax] = null; } };
   const addK = (k, ax, field, value, extra = {}) => { const key = { i: k, ax, field, tok: String(M.steps[k][field]).trim(), value, t0: t, tEnd: null, cut: false, ...extra }; keys.push(key); return key; };
   const dt = 0.005; let t = 0, i = 0, stepT0 = 0, arrivedAt = -1, armMoved = false, scMoved = false, slMoved = false, done = false;
+  const nextRun = (k) => { for (let q = k + 1; q < rows.length; q++) if (!rows[q].skip) return q; return -1; };   // like nextRunStep()
+  const skips = [];   // skipped rows: where on the timeline they'd have been
+  let reset = null;   // STEP_STOP: { after: row, t0, t1 } the move back to the start pose
   const slideSpeed = (r) => (r.speed > 0 ? r.speed : SLIDE_FAST);
   const slideAccel = (r) => (r.speed === RET_V ? RET_A : SLIDE_ACCEL);
   const slideDecel = (r) => (r.speed === RET_V ? RET_D : SLIDE_DECEL);
@@ -1060,9 +1087,10 @@ function simulate() {
     if (r.slide !== null) {
       const sp = slideSpeed(r); let vStart = slideVEnd, vEnd = 0;
       if (!slide.done) { slide.at(t); const pv = slide.sv * (r.slide >= slidePos ? 1 : -1); vStart = pv > 0 ? pv : 0; }   // a move still running (ended early by "arrived - ms"): carry its speed in
-      if ((r.waitType === "WAIT_ARRIVED" || r.waitType === "WAIT_SLIDE_ARRIVED") && k < rows.length - 1 && rows[k + 1].slide !== null) {
-        const d1 = r.slide - slidePos, d2 = rows[k + 1].slide - r.slide;
-        if (d1 * d2 > 0) vEnd = Math.min(slideSpeed(rows[k + 1]), sp);
+      const nk = r.stop ? -1 : nextRun(k);
+      if ((r.waitType === "WAIT_ARRIVED" || r.waitType === "WAIT_SLIDE_ARRIVED") && nk >= 0 && rows[nk].slide !== null) {
+        const d1 = r.slide - slidePos, d2 = rows[nk].slide - r.slide;
+        if (d1 * d2 > 0) vEnd = Math.min(slideSpeed(rows[nk]), sp);
       }
       slide.setLimits(sp, slideAccel(r), slideDecel(r)); slide.move(slidePos, r.slide, t, vStart, vEnd);
       slideTarget = r.slide; slideVEnd = vEnd; slMoved = true; slideUsed = true;
@@ -1092,8 +1120,10 @@ function simulate() {
     }
     return true;
   }
-  if (!rows.length) return { frames, spans, keys, total: 0, errs };
-  enter(0);
+  const first = nextRun(-1);
+  if (!rows.length || first < 0) return { frames, spans, keys, total: 0, errs, skips: rows.map((r, k) => ({ i: k, t: 0 })), rows };
+  for (let q = 0; q < first; q++) skips.push({ i: q, t: 0 });
+  enter(first);
   let nextFrame = 0;
   while (!done && t < 60) {
     arm.update(t); scoop.update(t);
@@ -1103,15 +1133,30 @@ function simulate() {
     if (openK.slide && slide.done) closeK("slide");
     if (t >= nextFrame - 1e-9) {
       const xv = slide.done ? 0 : slide.sv;
-      frames.push({ t, i, aT: arm.target, aC: arm.cmd, sT: scoop.target, sC: scoop.cmd, sO: scoop.out(t), x: slidePos, xT: slideTarget, xv, va: scoop.vib, vib: scoop.vib > 0 });
+      frames.push({ t, i, aT: arm.target, aC: arm.cmd, sT: scoop.target, sC: scoop.cmd, sO: scoop.out(t), x: slidePos, xT: slideTarget, xv, va: scoop.vib, vib: scoop.vib > 0, rs: !!reset });
       nextFrame += 0.01;
+    }
+    if (reset) {   // like the firmware's startReset(): done when the moves are (8 s at most)
+      if ((arm.mode === "idle" && scoop.mode === "idle" && slide.done) || t - reset.t0 >= 8) { reset.t1 = t; done = true; break; }
+      t += dt; continue;
     }
     let ok = met();
     if (!ok && rows[i].limit > 0 && (t - stepT0) * 1000 >= rows[i].limit - 1e-6) { ok = true; spans[spans.length - 1].limited = true; }   // OR AFTER: the time limit ends it
     if (ok) {
       spans[spans.length - 1].t1 = t;
-      if (i >= rows.length - 1) { done = true; break; }
-      enter(i + 1);
+      if (rows[i].stop) {   // STEP_STOP: back to the start pose (jog speeds, like ↺ Reset), then DONE
+        reset = { after: i, t0: t, t1: null };
+        for (const ax of ["arm", "scoop", "slide"]) closeK(ax, true);
+        scoop.vib = 0;
+        arm.moveTo(V("A_START", -58), t, ARM_SPEED * 0.5, ARM_ACCEL * 0.25, ARM_DECEL * 0.25);
+        scoop.moveTo(V("S_START", 0), t, SC_SPEED * 0.5, SC_ACCEL * 0.25, SC_DECEL * 0.25);
+        slide.setLimits(300, SLIDE_ACCEL, SLIDE_DECEL); slide.move(slidePos, 0, t, 0, 0); slideTarget = 0; slideUsed = true;
+        continue;
+      }
+      const nx = nextRun(i);
+      for (let q = i + 1; q < (nx < 0 ? rows.length : nx); q++) skips.push({ i: q, t });
+      if (nx < 0) { done = true; break; }
+      enter(nx);
       continue;   // same instant: the firmware enters the next step in the same loop pass
     }
     t += dt;
@@ -1119,7 +1164,16 @@ function simulate() {
   if (!done && spans.length) spans[spans.length - 1].t1 = t;
   for (const ax of ["arm", "scoop", "slide"]) closeK(ax, true);   // still moving at DONE: the robot freezes there
   frames.push({ ...frames[frames.length - 1], t });
-  return { frames, spans, keys, total: t, errs, rows, timedOut: !done };
+  // the steps after STEP_STOP: not run, but drawn greyed after the reset, with their normal timing
+  let ghost = [], ghostEnd = t;
+  if (reset && !opts.noStop) {
+    const full = simulate({ noStop: true }), after = (q) => q > reset.after;
+    const fs = full.spans.filter((x) => after(x.i)), off = fs.length ? t - fs[0].t0 : 0;
+    ghost = fs.map((x) => ({ i: x.i, name: x.name, t0: x.t0 + off, t1: (x.t1 ?? full.total) + off }));
+    for (const q of full.skips || []) if (after(q.i)) skips.push({ i: q.i, t: q.t + off, ghost: true });
+    ghostEnd = ghost.length ? Math.max(t, ghost[ghost.length - 1].t1) : t;
+  }
+  return { frames, spans, keys, total: t, errs, rows, timedOut: !done, skips, reset, ghost, ghostEnd };
 }
 let simTimer = 0;
 function scheduleSim() { clearTimeout(simTimer); simTimer = setTimeout(runSim, 60); }
@@ -1185,6 +1239,11 @@ const pctNum = (v) => { const t = String(v ?? "").trim(); if (t === "") return 1
 const pctK = (v) => { const n = pctNum(v); return n > 0 && n <= 255 ? n / 100 : 1; };
 const pctOk = (v) => { const n = pctNum(v); return Number.isInteger(n) && n >= 0 && n <= 255; };
 const adSet = (s, ax) => [ax + "Acc", ax + "Dec"].some((f) => pctNum(s[f]) !== 100 && pctNum(s[f]) !== 0);
+// switching "or after" on: a limit with room to spare (the step's time now + 1 s, at least 500 ms)
+function limDefault(i) {
+  const sp = SIM && SIM.spans.find((x) => x.i === i), d = sp && sp.t1 !== null ? (sp.t1 - sp.t0) * 1000 : 1000;
+  return String(Math.min(65535, Math.max(500, Math.ceil((d + 1000) / 100) * 100)));
+}
 function limitOk(s) { const v = resolve(s.limit ?? "0", "num"); return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 65535; }
 function setWaitType(i, w) {
   const s = M.steps[i], old = s.waitType; if (w === old) return;
@@ -1234,9 +1293,9 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;"
 function isIdle(f, v) { v = String(v).trim(); return v === "HOLD" || (f === "vib" && (v === "0" || v === "")); }
 function renderTable() {
   const tb = $("stepTable");
-  let h = `<thead><tr><th>#</th><th>Step</th>${COLS.map((c) => `<th>${c[1]} <span class="th-sub">· speed</span></th>`).join("")}<th>Next when</th><th title="The step ends after this many ms even if its condition hasn't happened (something stuck). 0 = no limit.">Or after <span class="th-sub">· ms</span></th><th style="text-align:right">Start</th><th style="text-align:right">Takes</th><th></th></tr></thead><tbody>`;
+  let h = `<thead><tr><th>#</th><th>Step</th>${COLS.map((c) => `<th>${c[1]} <span class="th-sub">· speed</span></th>`).join("")}<th>Next when</th><th title="The step ends after this many ms even if its condition hasn't happened (something stuck). 0 = no limit.">Or after <span class="th-sub">· ms</span></th><th style="text-align:right">Start</th><th style="text-align:right">Takes</th><th title="Test flags: skip a step, or stop the run after it (then back to the start pose)">Run</th><th></th></tr></thead><tbody>`;
   M.steps.forEach((s, i) => {
-    h += `<tr data-i="${i}" class="${i === S.sel ? "sel" : ""}"><td class="idx" data-jump="${i}" title="Edit this step"><span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>${i}</td>`;
+    h += `<tr data-i="${i}" class="${i === S.sel ? "sel" : ""}${notRunWhy(i) ? " off" : ""}"><td class="idx" data-jump="${i}" title="Edit this step"><span class="grip" title="Drag to reorder" aria-hidden="true">⠿</span>${i}</td>`;
     h += `<td><input id="c${i}_name" data-f="name" value="${esc(s.name)}" maxlength="12" style="min-width:110px;font-weight:500" aria-label="Step ${i} name"></td>`;
     for (const [f, lab, vf] of COLS) {
       const hold = String(s[f]).trim() === "HOLD" && resolve(s[vf], vf) !== undefined;   // a broken speed shows even on HOLD, so it can be fixed
@@ -1246,8 +1305,9 @@ function renderTable() {
     }
     h += `<td><div class="waitcell"><select id="c${i}_waitType" data-f="waitType" aria-label="Step ${i} next when">${WAITS.map((w) => `<option value="${w}"${w === s.waitType ? " selected" : ""}>${WAIT_LABEL[w]}</option>`).join("")}</select>` +
          `<input id="c${i}_waitVal" data-f="waitVal" class="num" type="number"${isArrived(s.waitType) ? "" : ' min="0"'} value="${esc(s.waitVal)}" aria-label="Step ${i} wait value" title="${isArrived(s.waitType) ? "ms after it arrives (negative = that long before)" : isPct(s.waitType) ? "% of the way" : "ms"}"></div></td>` +
-         `<td class="limcell"><input id="c${i}_limit" data-f="limit" class="num${+s.limit > 0 ? "" : " idle"}" type="number" min="0" step="100" value="${esc(s.limit ?? "0")}" aria-label="Step ${i} time limit, ms" title="Ends the step after this long even if its condition hasn't happened. 0 = no limit."></td>`;
+         `<td class="limcell"><input id="c${i}_limOn" type="checkbox" data-lim="${i}"${+s.limit > 0 ? " checked" : ""} aria-label="Step ${i}: or after a time limit" title="Ends the step after this long even if its Next step condition hasn't happened (something stuck). Off = no limit."><input id="c${i}_limit" data-f="limit" class="num" type="number" min="1" step="100" value="${+s.limit > 0 ? esc(s.limit) : ""}" placeholder="off"${+s.limit > 0 ? "" : " disabled"} aria-label="Step ${i} time limit, ms" title="Ends the step after this long even if its Next step condition hasn't happened (something stuck). Off = no limit."></td>`;
     h += `<td class="time" id="st${i}" data-jump="${i}">–</td><td class="time" id="du${i}" data-jump="${i}">–</td>`;
+    h += `<td class="flagcell"><select id="c${i}_flag" data-f="flag" aria-label="Step ${i} runs, is skipped, or stops the run"><option value="run"${!s.skip && !s.stop ? " selected" : ""}>▶ runs</option><option value="skip"${s.skip ? " selected" : ""}>⊘ skip</option><option value="stop"${s.stop && !s.skip ? " selected" : ""}>⏹ stop after</option></select></td>`;
     h += `<td class="acts"><button data-act="up" title="Move up" aria-label="Move step ${i} up">↑</button><button data-act="down" title="Move down" aria-label="Move step ${i} down">↓</button><button data-act="dup" title="Duplicate" aria-label="Duplicate step ${i}">⧉</button><button data-act="del" title="Delete" aria-label="Delete step ${i}">✕</button></td></tr>`;
   });
   h += `<tr class="addrow"><td colspan="99"><button class="add" data-addend>+ Add step at the end</button></td></tr>`;
@@ -1270,7 +1330,7 @@ function validateCells() {
       if (k === vf) el.title = overSpeed(i, vf) ? `Faster than the servo can go (about ${Math.round(overSpeed(i, vf))}°/s): it gets there later than the twin shows` : "";
     }
     const w = $(`c${i}_waitVal`); if (w) w.classList.toggle("bad", !waitValOk(s));
-    const lm = $(`c${i}_limit`); if (lm) { lm.classList.toggle("bad", !limitOk(s)); lm.classList.toggle("idle", !(+s.limit > 0)); }
+    const lm = $(`c${i}_limit`); if (lm) lm.classList.toggle("bad", !limitOk(s));
     for (const f of AD_FIELDS) { const el = $(`c${i}_${f}`); if (el) { el.classList.toggle("bad", !pctOk(s[f])); el.classList.toggle("idle", pctNum(s[f]) === 100 || pctNum(s[f]) === 0); } }
   });
 }
@@ -1293,22 +1353,30 @@ function updateStepTimes() {
   M.steps.forEach((s, i) => {
     const sp = SIM.spans.find((x) => x.i === i);
     const a = $("st" + i), b = $("du" + i);
-    if (a) a.textContent = sp ? sp.t0.toFixed(2) + " s" : "–";
+    if (a) a.textContent = sp ? sp.t0.toFixed(2) + " s" : s.skip ? "skipped" : notRunWhy(i) ? "not run" : "–";
     if (b) { const w = stepWarning(i); b.innerHTML = (sp && sp.t1 !== null ? Math.round((sp.t1 - sp.t0) * 1000) + " ms" : "–") + (w ? ` <span class="warn" title="${esc(w)}">⚠</span>` : ""); }
   });
 }
 function refreshRow(i) { validateCells(); }
 $("stepTable").addEventListener("input", (e) => {
   const el = e.target, tr = el.closest("tr"); if (!tr || !el.dataset.f || el.tagName === "SELECT" || el.dataset.numFor) return;
-  const i = +tr.dataset.i; M.steps[i][el.dataset.f] = el.value.trim();
+  const i = +tr.dataset.i;
+  if (el.dataset.f === "limit" && !(+el.value >= 1)) return;   // on: a limit of at least 1 ms (the checkbox turns it off)
+  M.steps[i][el.dataset.f] = el.value.trim();
   if (el.dataset.f === "name") M.steps[i].name = el.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 12);
   validateCells(); refreshRow(i); markDirty();
   if (i === S.sel) renderInspector();
 });
 $("stepTable").addEventListener("change", (e) => {
-  const el = e.target, f = el.dataset.f; if (el.tagName !== "SELECT" || !f) return;
+  const el = e.target, f = el.dataset.f;
+  if (el.dataset.lim !== undefined) {   // the "or after" checkbox
+    const i = +el.dataset.lim; M.steps[i].limit = el.checked ? limDefault(i) : "0"; markDirty(); renderTable(); if (i === S.sel) renderInspector();
+    if (el.checked) { const l = $(`c${i}_limit`); if (l) { l.focus(); l.select(); } }
+    return;
+  } if (el.tagName !== "SELECT" || !f) return;
   const i = +el.closest("tr").dataset.i;
   if (f === "waitType") { setWaitType(i, el.value); renderTable(); markDirty(); if (i === S.sel) renderInspector(); return; }
+  if (f === "flag") { setFlag(i, el.value); return; }
   if (el.value === "__num") { numberCell(el, i, f); return; }
   const wasHold = String(M.steps[i][f]).trim() === "HOLD";
   M.steps[i][f] = el.value; markDirty();
@@ -1328,7 +1396,7 @@ function numberCell(sel, i, f) {
     if (done) return; done = true;
     let v = parseFloat(inp.value);
     if (ok && !isNaN(v) && (!isV || v > 0)) {
-      if (isV && v > servoMax(SPEED_OF[f])) { v = servoMax(SPEED_OF[f]); toast(`Capped at ${fmtV(v)}°/s: the servo can't go faster`); }
+      if (isV && v > servoMax(SPEED_OF[f])) toast(`${fmtV(v)}°/s is ${overMsg(SPEED_OF[f])}`);
       M.steps[i][f] = fmtV(v); markDirty();
     }
     renderTable(); if (i === S.sel) renderInspector();
@@ -1347,7 +1415,7 @@ $("stepTable").addEventListener("click", (e) => {
   const i = +e.target.closest("tr").dataset.i, st = M.steps;
   if (act === "up" && i > 0) { [st[i - 1], st[i]] = [st[i], st[i - 1]]; if (S.sel === i) S.sel--; }
   if (act === "down" && i < st.length - 1) { [st[i + 1], st[i]] = [st[i], st[i + 1]]; if (S.sel === i) S.sel++; }
-  if (act === "dup") st.splice(i + 1, 0, { ...st[i], name: uniqueName(st[i].name) });
+  if (act === "dup") st.splice(i + 1, 0, { ...st[i], name: uniqueName(st[i].name), stop: false });
   if (act === "del") { if (st.length <= 1) return; st.splice(i, 1); if (S.sel >= st.length) S.sel = st.length - 1; }
   renderTable(); renderInspector(); markDirty();
 });
@@ -1405,7 +1473,7 @@ const ADD_MENU = [
 ];
 function addStep(key, at) {
   const p = PRESETS_STEP[key]; if (!p) return;
-  const st = { name: "", arm: HOLD, armV: "0", scoop: HOLD, scoopV: "0", slide: HOLD, speed: "0", vib: "0", waitType: "WAIT_MS", waitVal: "500", limit: "0", armAcc: "100", armDec: "100", scoopAcc: "100", scoopDec: "100", note: "", ...p };
+  const st = { name: "", arm: HOLD, armV: "0", scoop: HOLD, scoopV: "0", slide: HOLD, speed: "0", vib: "0", waitType: "WAIT_MS", waitVal: "500", limit: "0", armAcc: "100", armDec: "100", scoopAcc: "100", scoopDec: "100", skip: false, stop: false, note: "", ...p };
   st.name = M.steps.some((s) => s.name === st.name) ? uniqueName(st.name) : st.name;
   M.steps.splice(at, 0, st);
   S.sel = at; renderTable(); markDirty(); openTab("pane-step"); renderInspector();
@@ -1435,6 +1503,33 @@ function openAddMenu(anchor, at) {
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAddMenu(); });
 $("btnAddStep").onclick = (e) => openAddMenu(e.currentTarget, S.sel >= 0 ? S.sel + 1 : M.steps.length);
 // when everything step i started has got where it was going (moves can run on into later steps)
+// ---- test flags: ⊘ skip a step (it stays in the file and on the timeline, greyed) / ⏹ stop after a step (then back to the start pose) ----
+function stopIdx() { return M.steps.findIndex((q) => q.stop && !q.skip); }
+function notRunWhy(i) {
+  const s = M.steps[i]; if (!s) return "";
+  if (s.skip) return `${s.name} is skipped (⊘): it's in the file but doesn't run.`;
+  const k = stopIdx(); if (k >= 0 && i > k) return `${s.name} doesn't run: the run stops after ${M.steps[k].name} (⏹).`;
+  return "";
+}
+function setFlag(i, kind) {
+  const s = M.steps[i]; if (!s) return;
+  if (kind === "stop") M.steps.forEach((q, k) => { if (k !== i) q.stop = false; });   // one stop: the first one would win anyway
+  s.skip = kind === "skip"; s.stop = kind === "stop";
+  markDirty(); renderTable(); runSim(); renderInspector();
+  toast(kind === "skip" ? `${s.name} is skipped: it stays in the file and on the timeline (⊘), but doesn't run. Save and upload to make the robot skip it too.`
+    : kind === "stop" ? `The run now stops after ${s.name}, then goes back to the start pose (⏹ RESET). Save and upload to test it on the robot. Clear it before the competition.`
+    : `${s.name} runs normally again`);
+}
+function openFlagMenu(i, x, y) {
+  const s = M.steps[i]; if (!s) return;
+  let a = $("flagAnchor"); if (!a) { a = document.createElement("span"); a.id = "flagAnchor"; a.style.cssText = "position:fixed;width:1px;height:1px;pointer-events:none"; document.body.appendChild(a); }
+  a.style.left = x + "px"; a.style.top = y + "px";
+  const cur = s.skip ? "skip" : s.stop ? "stop" : "run", it = (v, b, d) => `<button role="menuitemradio" aria-checked="${cur === v}" data-flag="${v}"><b>${b}</b><span>${d}</span></button>`;
+  openPop("flagMenu", a, `<div class="ph"><b>${esc(s.name)}</b>: test flags (saved in Sequence.h)</div>` +
+    it("run", "▶ Runs normally", "") + it("skip", "⊘ Skip this step", "stays on the timeline, greyed; the run goes straight past it") +
+    it("stop", "⏹ Stop after this step", "then the robot goes back to the start pose; the rest is greyed"),
+    (ev) => { const b = ev.target.closest("button[data-flag]"); if (!b) return; closePop(); setFlag(i, b.dataset.flag); });
+}
 function stepDoneT(i) {
   if (!SIM) return 0;
   const sp = SIM.spans.find((x) => x.i === i); if (!sp) return 0;
@@ -1455,7 +1550,7 @@ function selectStep(i, jump) {
       if (jump === "end") showTargets(i);
       else { S.t = sp.t0 + 0.001; S.pin = null; }
       drawAt(S.t);
-    } else toast(`${M.steps[i] ? M.steps[i].name : "That step"} is never reached in the preview (the run ends before it).`);
+    } else notReached(i);
   }
   renderInspector();
 }
@@ -1503,7 +1598,7 @@ function refocus() {   // after any edit: keep showing the same step / move, at 
 }
 // ---- one step at a time: back to its start (= where the step before left things), play it, jump to its end ----
 const stepSpan = (i) => SIM && SIM.spans.find((x) => x.i === i);
-function notReached(i) { toast(`${M.steps[i] ? M.steps[i].name : "That step"} is never reached in the preview (the run ends before it).`); }
+function notReached(i) { toast(notRunWhy(i) || `${M.steps[i] ? M.steps[i].name : "That step"} is never reached in the preview (the run ends before it).`); }
 function stepToStart(i) {
   const sp = stepSpan(i); if (!sp) { notReached(i); return; }
   selectStep(i, false); togglePlay(false); S.preview = null; S.focus = null;
@@ -1559,7 +1654,8 @@ function namesOf(kind) { return M.consts.filter((c) => groupKind(c.group) === ki
 function storyHtml(i) {
   const sp = stepSpan(i), w = stepWarning(i);
   const t = sp ? `starts ${sp.t0.toFixed(2)} s · takes ${sp.t1 !== null ? Math.round((sp.t1 - sp.t0) * 1000) + " ms" : "–"} · its moves finish at ${stepDoneT(i).toFixed(2)} s` : "not reached";
-  return `${describe(i)}<span class="t">${t}</span>${w ? `<span class="t warn">⚠ ${esc(w)}</span>` : ""}`;
+  const why = notRunWhy(i), st = M.steps[i] && M.steps[i].stop && !M.steps[i].skip ? `<span class="t flagnote">⏹ The run stops after this step, then the robot goes back to the start pose (test flag).</span>` : "";
+  return `${why ? `<span class="t flagnote">${esc(why)}</span>` : ""}${describe(i)}<span class="t">${why ? "not run" : t}</span>${st}${w && !why ? `<span class="t warn">⚠ ${esc(w)}</span>` : ""}`;
 }
 function refreshStory() { const el = document.querySelector("#inspHost .story"); if (el && M.steps[S.sel]) el.innerHTML = storyHtml(S.sel); }
 const AX_V = { arm: "armV", scoop: "scoopV", slide: "speed" };
@@ -1621,14 +1717,15 @@ function renderInspector() {
   host.innerHTML = `<div class="insp">
     <div class="insp-head"><button id="iPrev" aria-label="Previous step" title="Previous step (←)"${i <= 0 ? " disabled" : ""}>‹</button><span class="mono">#${i}</span>
       <input id="iName" value="${esc(s.name)}" maxlength="12" aria-label="Step name"><button id="iNext" aria-label="Next step" title="Next step (→)"${i >= M.steps.length - 1 ? " disabled" : ""}>›</button>
-      <span class="sp"></span><button id="iAdd" class="add small" title="Add a step after this one">+ After</button><button id="iDup" class="small" title="Duplicate this step" aria-label="Duplicate this step">⧉</button><button id="iDel" class="small" title="Delete this step (Ctrl+Z brings it back)" aria-label="Delete this step">✕</button></div>
-    <div class="story">${storyHtml(i)}</div>
+      <button id="iSkip" class="small flagbtn" aria-pressed="${!!s.skip}" title="Skip this step: it stays in the file and on the timeline (greyed), but the run goes straight past it. Saved in Sequence.h, so the uploaded robot skips it too.">⊘ Skip</button><button id="iStop" class="small flagbtn flagstop" aria-pressed="${!!s.stop && !s.skip}" title="Stop the run after this step, then go back to the start pose (to test part of the run, e.g. the intake). Saved in Sequence.h. Clear it before the competition.">⏹ Stop</button>
+      <span class="sp"></span><button id="iAdd" class="add small" title="Add a step after this one" aria-label="Add a step after this one">+</button><button id="iDup" class="small" title="Duplicate this step" aria-label="Duplicate this step">⧉</button><button id="iDel" class="small" title="Delete this step (Ctrl+Z brings it back)" aria-label="Delete this step">✕</button></div>
+    <div class="story${notRunWhy(i) ? " off" : ""}">${storyHtml(i)}</div>
     ${axisCtl(i, "arm", "Arm")}
     ${axisCtl(i, "scoop", "Scoop")}
     ${axisCtl(i, "slide", "Slides")}
     <div class="ictl"><label for="iWaitT">Next step</label><div class="pair"><select id="iWaitT" title="${isArrived(s.waitType) ? "all arrived = every axis has stopped (arm, scoop and slides). ± ms after / before it arrives" : "When the next step starts"}">${WAITS.map((w) => `<option value="${w}"${w === s.waitType ? " selected" : ""}>${WAIT_SHORT[w]}</option>`).join("")}</select>
       <input id="iWaitV" class="num" type="number"${isArrived(s.waitType) ? "" : ' min="0"'} step="${isPct(s.waitType) ? 5 : 10}" value="${esc(s.waitVal)}" aria-label="Next step value" title="${isArrived(s.waitType) ? "ms after it arrives; negative = that long before it arrives" : isPct(s.waitType) ? "% of the way" : "ms"}"><span class="hint">${isPct(s.waitType) ? "%" : "ms"}</span></div>
-      <div class="pair"><label class="lab" for="iLimit" title="Ends the step after this long even if its condition hasn't happened (something stuck). 0 = no limit.">or after</label><input id="iLimit" class="num lim" type="number" min="0" step="100" value="${esc(s.limit ?? "0")}" aria-label="Time limit, ms (0 = none)" title="Ends the step after this long even if its condition hasn't happened (something stuck). 0 = no limit."><span class="hint">ms</span></div>
+      <div class="pair"><label class="lab" title="Ends the step after this long even if its Next step condition hasn't happened (something stuck). Off = no limit."><input id="iLimOn" type="checkbox"${+s.limit > 0 ? " checked" : ""}> or after</label><input id="iLimit" class="num lim" type="number" min="1" step="100" value="${+s.limit > 0 ? esc(s.limit) : ""}" placeholder="off"${+s.limit > 0 ? "" : " disabled"} aria-label="Time limit, ms" title="Ends the step after this long even if its Next step condition hasn't happened (something stuck). Off = no limit."><span class="hint">ms</span></div>
       <div class="pair"><label class="choices" style="flex-direction:row" title="Shake the scoop while this step runs"><input id="iVibOn" type="checkbox"${vibOn ? " checked" : ""}> shake</label>
       ${vibOn ? `<select id="iVib" data-f="vib" aria-label="Vibration amount">${cellOptions("vib", s.vib).filter(([o]) => o !== "0").map(([o, l]) => `<option value="${esc(o)}"${o === String(s.vib).trim() ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>` : ""}</div></div>
   </div>`;
@@ -1659,11 +1756,14 @@ function renderInspector() {
   $("iVibOn").onchange = (e) => { upd("vib", e.target.checked ? (vbNames[0] || "5") : "0"); renderInspector(); };
   $("iWaitT").onchange = (e) => { setWaitType(i, e.target.value); markDirty(); renderTable(); renderInspector(); };
   $("iWaitV").oninput = (e) => { const v = e.target.value; if (v !== "" && !isNaN(+v) && (+v >= 0 || isArrived(M.steps[i].waitType))) upd("waitVal", String(Math.max(-32768, Math.min(32767, Math.round(+v))))); };
-  $("iLimit").oninput = (e) => { const v = e.target.value; if (v !== "" && +v >= 0) upd("limit", String(Math.min(65535, Math.round(+v)))); };
+  $("iLimit").oninput = (e) => { const v = e.target.value; if (v !== "" && +v >= 1) upd("limit", String(Math.min(65535, Math.round(+v)))); };
+  $("iLimOn").onchange = (e) => { upd("limit", e.target.checked ? limDefault(i) : "0"); renderInspector(); if (e.target.checked) { const l = $("iLimit"); if (l) { l.focus(); l.select(); } } };
+  $("iSkip").onclick = () => setFlag(i, M.steps[i].skip ? "run" : "skip");
+  $("iStop").onclick = () => setFlag(i, M.steps[i].stop && !M.steps[i].skip ? "run" : "stop");
   $("iPrev").onclick = () => selectStep(i - 1, "end");
   $("iNext").onclick = () => selectStep(i + 1, "end");
   $("iAdd").onclick = (e) => openAddMenu(e.currentTarget, i + 1);
-  $("iDup").onclick = () => { M.steps.splice(i + 1, 0, { ...M.steps[i], name: uniqueName(M.steps[i].name) }); S.sel = i + 1; renderTable(); markDirty(); renderInspector(); };
+  $("iDup").onclick = () => { M.steps.splice(i + 1, 0, { ...M.steps[i], name: uniqueName(M.steps[i].name), stop: false }); S.sel = i + 1; renderTable(); markDirty(); renderInspector(); };
   $("iDel").onclick = () => { if (M.steps.length <= 1) return; const nm = M.steps[i].name; M.steps.splice(i, 1); S.sel = Math.min(i, M.steps.length - 1); renderTable(); markDirty(); renderInspector(); toast(`Deleted ${nm} (Ctrl+Z brings it back)`); };
 }
 // "Change this step only": the step gets its own copy of a shared name (NAME_STEP), same value
@@ -1707,15 +1807,16 @@ function applyHold(plan, skipI) {   // after the position changed: each held mov
     SIM = simulate();   // later moves start from where the earlier ones now end (not drawn)
     const k = SIM.keys.find((q) => q.i === g.i && q.ax === plan.ax); if (!k) continue;
     const mx = servoMax(plan.ax), cur = resolve(M.steps[g.i][g.vField], g.vField), curV = cur > 0 ? cur : constVal(DEF_SPEED[plan.ax], 0);
-    let sp = Math.min(mx, Math.max(1, Math.round(solveSpeed(k, k.value, g.dur) * 10) / 10));
+    let sp = Math.min(speedBound(plan.ax), Math.max(1, Math.round(solveSpeed(k, k.value, g.dur) * 10) / 10));
     const dNew = moveDur(k, sp, k.value), dCur = moveDur(k, curV, k.value);
     // only change the number when it gets closer (a move still carrying a faster speed in takes the same time at any slower speed)
     if (Math.abs(sp - curV) >= 0.05 && Math.abs(dNew - g.dur) < Math.abs(dCur - g.dur) - 0.002) M.steps[g.i][g.vField] = fmtV(sp);
     else sp = curV;
     const dt = moveDur(k, sp, k.value) - g.dur;
+    if (sp > mx + 0.05) r.over = (r.over || []).concat(M.steps[g.i].name);   // allowed, but the real servo can't follow
     if (Math.abs(dt) > 0.012) {
       r.held = false;
-      if (Math.abs(dt) > Math.abs(r.dt)) { r.dt = dt; r.step = M.steps[g.i].name; r.why = dt > 0 && sp >= mx - 0.05 ? "the servo's top speed" : dt < 0 && sp <= 1.05 ? "1°/s is the slowest" : "it's still moving fast from the step before"; }
+      if (Math.abs(dt) > Math.abs(r.dt)) { r.dt = dt; r.step = M.steps[g.i].name; r.why = dt > 0 && sp >= speedBound(plan.ax) - 0.05 ? "5× the servo's top speed is as far as it goes" : dt < 0 && sp <= 1.05 ? "1°/s is the slowest" : "it's still moving fast from the step before"; }
     }
   }
   return r;
@@ -1739,6 +1840,7 @@ function nudgeApply(i, ax, v, inp) {
   if (HOLDB) HOLDB.sig = sequenceText();   // any other edit before the next press = a new plan
   markDirty(1500); runSim();   // a run of arrow presses = one undo step
   if (!hr.held && performance.now() - holdToastT > 2500) { holdToastT = performance.now(); toast(`${AX_LABEL[ax][0].toUpperCase() + AX_LABEL[ax].slice(1)}: ${holdMsg(hr)}`); }
+  else if (hr.over && performance.now() - holdToastT > 2500) { holdToastT = performance.now(); toast(`${hr.over.join(", ")} keeps its time, but ${overMsg(ax)}`); }
   const vs = $("i_" + AX_V[ax]); if (vs && ax !== "slide") vs.innerHTML = optsHtml(AX_V[ax], s[AX_V[ax]]);
   const k = SIM.keys.find((q) => q.i === i && q.field === ax && q.tEnd !== null);
   const label = `${s.name} · ${c ? c.name : AX_LABEL[ax]} ${fmtV(v)}${ax === "slide" ? " mm" : "°"}`;
@@ -1868,7 +1970,7 @@ function drawTimeline() {
   cv.width = w * dpr; cv.height = h * dpr;
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   if (!SIM) return;
-  const T = TL.freezeT || Math.max(SIM.total, 0.5), X = (t) => TL.padL + (t / T) * (w - TL.padL - TL.padR);
+  const T = TL.freezeT || Math.max(SIM.ghostEnd || SIM.total, 0.5), X = (t) => TL.padL + (t / T) * (w - TL.padL - TL.padR);
   g.font = "11px " + css("--f-data"); g.textBaseline = "middle";
   // gantt
   const pal = [css("--arm"), css("--scoop"), css("--slide"), css("--vib"), css("--accent")];
@@ -1884,6 +1986,41 @@ function drawTimeline() {
     if (sp.t1 !== null && (TL.hoverEdge === sp.i || (RT && RT.i === sp.i))) { g.fillStyle = css("--accent"); g.fillRect(x1 - 1.5, 1, 3, TL.gantt - 2); }
     if (sp.limited) { g.fillStyle = css("--pour"); g.fillRect(x1 - 2, 4, 2, TL.gantt - 8); g.textAlign = "right"; g.fillText("⏱", x1 - 4, TL.gantt / 2); g.textAlign = "left"; }
   });
+  // STEP_STOP: the move back to the start pose, then the steps that don't run (greyed, their normal timing)
+  if (SIM.reset && SIM.reset.t1 !== null) {
+    const x0 = X(SIM.reset.t0), x1 = X(SIM.reset.t1);
+    g.fillStyle = css("--pour"); g.globalAlpha = 0.25; g.fillRect(x0, 4, Math.max(2, x1 - x0), TL.gantt - 8); g.globalAlpha = 1;
+    g.fillStyle = css("--ink"); const lab = "⏹ RESET"; if (x1 - x0 > g.measureText(lab).width + 6) g.fillText(lab, x0 + 4, TL.gantt / 2); else g.fillText("⏹", x0 + 2, TL.gantt / 2);
+  }
+  TL.ghostPts = [];
+  if (SIM.ghost && SIM.ghost.length) {
+    g.save(); g.globalAlpha = 0.35;
+    SIM.ghost.forEach((sp) => {
+      const x0 = X(sp.t0), x1 = X(sp.t1);
+      g.fillStyle = css("--grid"); g.fillRect(x0, 4, Math.max(1, x1 - x0), TL.gantt - 8);
+      if (sp.i === S.sel) { g.strokeStyle = css("--accent"); g.lineWidth = 2; g.strokeRect(x0 + 1, 5, Math.max(1, x1 - x0 - 2), TL.gantt - 10); }
+      g.fillStyle = css("--muted"); const tw = g.measureText(sp.name).width;
+      if (x1 - x0 > tw + 6) g.fillText(sp.name, x0 + 4, TL.gantt / 2);
+      TL.ghostPts.push({ i: sp.i, x0, x1 });
+    });
+    g.restore();
+    const xs = X(SIM.total);   // the part of the timeline that doesn't run
+    g.fillStyle = css("--muted"); g.globalAlpha = 0.08; g.fillRect(xs, TL.gantt, w - TL.padR - xs, h - TL.gantt - 18); g.globalAlpha = 1;
+    g.fillStyle = css("--muted"); g.textAlign = "left";
+    g.fillText(`not run: the run stops after ${M.steps[SIM.reset.after] ? M.steps[SIM.reset.after].name : ""}`, Math.min(xs + 8, w - TL.padR - 230), h - 26);
+  }
+  // skipped rows: a small ⊘ chip where they would have run (click it to select the step)
+  TL.skipPts = [];
+  for (const q of SIM.skips || []) {
+    const x = X(q.t), n = TL.skipPts.filter((p) => Math.abs(p.x - x) < 15).length, cx = x + n * 15;
+    g.save(); g.globalAlpha = q.ghost ? 0.4 : 0.9;
+    g.fillStyle = css("--panel"); g.strokeStyle = css("--muted"); g.lineWidth = 1;
+    g.beginPath(); g.arc(cx, TL.gantt / 2, 6.5, 0, 2 * Math.PI); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(cx - 4, TL.gantt / 2 + 4); g.lineTo(cx + 4, TL.gantt / 2 - 4); g.stroke();
+    if (q.i === S.sel) { g.strokeStyle = css("--accent"); g.lineWidth = 2; g.beginPath(); g.arc(cx, TL.gantt / 2, 9, 0, 2 * Math.PI); g.stroke(); }
+    g.restore();
+    TL.skipPts.push({ i: q.i, x: cx });
+  }
   // hold strip
   const y0 = TL.gantt + 2;
   for (let k = 0; k < SIM.frames.length - 1; k++) {
@@ -2062,8 +2199,12 @@ function keyInfo(k) {
 // how long a servo move takes at speed v to `target`, starting the way it really starts (position, speed, accel)
 function moveDur(k, v, target = k.value) { const p = new Profile(); p.setLimits(v, k.acc, k.dec); p.moveFrom(k.x0, target, 0, k.v0); return p.total(); }
 function solveSpeed(k, target, want) {   // the speed that makes the move take `want` s (clamped to 1 … the servo's top speed)
-  const mx = servoMax(k.ax); let lo = 1, hi = mx;
-  if (moveDur(k, hi, target) >= want) return hi;
+  const mx = speedBound(k.ax); let lo = 1, hi = mx;
+  if (moveDur(k, hi, target) >= want) {   // the accel / decel limit it, not the speed: the slowest speed within 2 ms of the fastest move
+    const best = moveDur(k, hi, target) + 0.002;
+    for (let n = 0; n < 30; n++) { const m = (lo + hi) / 2; if (moveDur(k, m, target) > best) lo = m; else hi = m; }
+    return hi;
+  }
   if (moveDur(k, lo, target) <= want) return lo;
   for (let n = 0; n < 30; n++) { const m = (lo + hi) / 2; if (moveDur(k, m, target) > want) lo = m; else hi = m; }
   return hi;
@@ -2080,9 +2221,13 @@ function startKeyDrag(k, e) {
          label: () => {
            const cur = M.steps[KD.i], out = [`${KD.named || cur.name + " " + AX_LABEL[KD.ax]}: ${fmtV(KD.v0)} → ${fmtV(KD.v)}${KD.unit}`];
            if (KD.canTime) { const sv = resolve(cur[KD.vField], KD.vField), sp = sv > 0 ? sv : constVal(DEF_SPEED[KD.ax], 0); KD.sp = sp;
-             out.push(`speed ${fmtV(KD.sp0)} → ${fmtV(sp)}°/s · the move takes ${moveDur(KD.key, sp, KD.v).toFixed(2)} s${sp >= servoMax(KD.ax) - 0.05 ? " (servo's top speed)" : ""}`);
+             out.push(`speed ${fmtV(KD.sp0)} → ${fmtV(sp)}°/s · the move takes ${moveDur(KD.key, sp, KD.v).toFixed(2)} s`);
+             if (KD.xOn && KD.want && moveDur(KD.key, sp, KD.v) > KD.want + 0.01) out.push("as quick as it gets at this accel / decel: raise them (a/d in the Step tab) to arrive sooner");
+             if (sp > servoMax(KD.ax) + 0.05) out.push("⚠ " + overMsg(KD.ax));
+             else if (KD.heldR.over && KD.yOn && !KD.xOn) out.push(`⚠ ${KD.heldR.over.join(", ")}: ${overMsg(KD.ax)}`);
              if (KD.yOn && !KD.xOn) out.push(KD.heldR.held ? "keeps its time: speed re-solved (and the next move's)" : holdMsg(KD.heldR)); }
            else if (KD.yOn) out.push("slide speeds are fixed, so it arrives earlier / later");
+           if (KD.ax === "slide" && KD.v > cfgv("SLIDE_END_STOP_MM")) out.push(`⚠ past the end stop (${Math.round(cfgv("SLIDE_END_STOP_MM"))} mm): the real slides stall there`);
            if (KD.named && KD.used.length > 1) out.push(`also moves ${KD.used.filter((n) => n !== cur.name).join(", ")}`);
            return out; } };
   KSEL = { i: k.i, field: k.field };
@@ -2113,7 +2258,7 @@ function keyApply(ev) {
   if (KD.xOn) {   // the speed that makes this move arrive where the pointer is (at the dragged-to position)
     if (KD.xFine !== fine) { KD.xBaseT = tlTime(ev); KD.xBaseDur = moveDur(KD.key, KD.sp, KD.v); KD.xFine = fine; }
     const want = Math.max(0.02, KD.xBaseDur + (tlTime(ev) - KD.xBaseT) * (fine ? 0.1 : 1));
-    KD.sp = Math.min(servoMax(KD.ax), Math.max(1, Math.round(solveSpeed(KD.key, KD.v, want) * 10) / 10));
+    KD.sp = Math.min(speedBound(KD.ax), Math.max(1, Math.round(solveSpeed(KD.key, KD.v, want) * 10) / 10)); KD.want = want;
     st[KD.vField] = fmtV(KD.sp);
   }
   // up / down holds the time: this move (unless it's being re-timed sideways too) and the next one on this servo
@@ -2160,12 +2305,13 @@ function keyArrow(e) {
     return true;
   }
   if (k.ax === "slide") { toast("Slide speeds are fixed: ↑ ↓ move a slide ◆, ← → don't"); return true; }
-  const mx = servoMax(k.ax), dur = moveDur(k, k.speed), want = Math.max(0.02, dur + 0.01 * mult * (e.key === "ArrowRight" ? 1 : -1));
+  const mx = speedBound(k.ax), dur = moveDur(k, k.speed), want = Math.max(0.02, dur + 0.01 * mult * (e.key === "ArrowRight" ? 1 : -1));
   let sp = Math.round(solveSpeed(k, k.value, want) * 10) / 10;
   if (sp === Math.round(k.speed * 10) / 10) sp += e.key === "ArrowRight" ? -0.1 : 0.1;   // rounding: always at least one step
   sp = Math.min(mx, Math.max(1, sp));
-  if (Math.abs(sp - k.speed) < 0.05) { toast(sp >= mx - 0.05 ? "That's the servo's top speed" : "That's as slow as it goes (1°/s)"); return true; }
+  if (Math.abs(sp - k.speed) < 0.05 || (e.key === "ArrowLeft" && moveDur(k, sp) > moveDur(k, k.speed) - 0.001)) { toast(e.key === "ArrowLeft" ? "As quick as it gets at this accel / decel: raise them (a/d in the Step tab) to arrive sooner" : "That's as slow as it goes (1°/s)"); return true; }
   M.steps[k.i][k.vField] = fmtV(sp); markDirty(1500); runSim();
+  if (sp > servoMax(k.ax) + 0.05) toast(`${fmtV(sp)}°/s is ${overMsg(k.ax)}`);
   const nk = SIM.keys.find((q) => sameKey(q, k) && q.tEnd !== null); if (nk) showKey(nk, label);
   const sel = $("i_" + k.vField); if (sel) sel.innerHTML = optsHtml(k.vField, M.steps[k.i][k.vField]);
   drawAt(S.t);
@@ -2183,21 +2329,39 @@ $("tl").addEventListener("pointerdown", (e) => {
   if (document.activeElement !== $("tl")) $("tl").focus({ preventScroll: true });   // ← → now play the timeline
   if (ei >= 0) { startRetime(ei, e); return; }
   if (k) { startKeyDrag(k, e); return; }
+  const fh = tlFlagHit(e);
+  if (fh >= 0) { selectStep(fh, false); openTab("pane-step"); drawTimeline(); return; }
   tlDrag = true; $("tl").setPointerCapture(e.pointerId); S.preview = null; S.focus = null; S.pin = null; togglePlay(false); KSEL = null;
-  S.t = tlTime(e); S.cue = S.t;
+  S.t = Math.min(tlTime(e), SIM ? SIM.total : 0); S.cue = S.t;
   if (e.offsetY < TL.gantt && SIM) { const sp = SIM.spans.find((x) => S.t >= x.t0 && S.t < (x.t1 ?? 1e9)); if (sp) selectStep(sp.i, false); }
   drawAt(S.t);
 });
 $("tl").addEventListener("pointermove", (e) => {
   if (RT) { moveRetime(e); return; }
   if (KD) { keyMove(e); return; }
-  if (tlDrag) { S.t = tlTime(e); S.cue = S.t; drawAt(S.t); return; }
-  const ei = tlEdgeAt(e), k = ei < 0 ? tlKeyAt(e) : null, cv = $("tl");
+  if (tlDrag) { S.t = Math.min(tlTime(e), SIM ? SIM.total : 0); S.cue = S.t; drawAt(S.t); return; }
+  const ei = tlEdgeAt(e), k = ei < 0 ? tlKeyAt(e) : null, cv = $("tl"), fh = ei < 0 && !k ? tlFlagHit(e) : -1;
   cv.style.cursor = ei >= 0 ? "col-resize" : k ? (k.ax !== "slide" ? "move" : "ns-resize") : e.offsetY < TL.gantt ? "pointer" : "default";
-  cv.title = ei >= 0 ? `Drag to change how long ${M.steps[ei] ? M.steps[ei].name : ""} takes` : k ? keyInfo(k).text : "";
+  cv.title = ei >= 0 ? `Drag to change how long ${M.steps[ei] ? M.steps[ei].name : ""} takes` : k ? keyInfo(k).text : fh >= 0 ? notRunWhy(fh) + " Click to select it; right-click for the flags." : e.offsetY < TL.gantt ? "Right-click a step: skip it, or stop the run after it" : "";
   const redraw = ei !== TL.hoverEdge || !sameKey(k, TL.hoverKey) && (k || TL.hoverKey);
   TL.hoverEdge = ei; TL.hoverKey = k ? { i: k.i, field: k.field } : null;
   if (redraw) drawTimeline();
+});
+function tlFlagHit(e) {   // a ⊘ chip or a greyed (not run) block in the step row -> its step, else -1
+  if (!SIM || e.offsetY > TL.gantt) return -1;
+  for (const p of TL.skipPts || []) if (Math.abs(e.offsetX - p.x) <= 8) return p.i;
+  for (const p of TL.ghostPts || []) if (e.offsetX >= p.x0 && e.offsetX < p.x1) return p.i;
+  return -1;
+}
+function tlStepAt(e) {   // any step under the pointer in the step row (run, skipped or greyed)
+  const fh = tlFlagHit(e); if (fh >= 0) return fh;
+  if (!SIM || e.offsetY > TL.gantt) return -1;
+  const t = tlTime(e), sp = SIM.spans.find((x) => t >= x.t0 && t < (x.t1 ?? 1e9));
+  return sp ? sp.i : -1;
+}
+$("tl").addEventListener("contextmenu", (e) => {
+  const i = tlStepAt(e); if (i < 0) return;
+  e.preventDefault(); selectStep(i, false); openFlagMenu(i, e.clientX, e.clientY);
 });
 $("tl").addEventListener("pointerleave", () => { if ((TL.hoverEdge >= 0 || TL.hoverKey) && !RT && !KD) { TL.hoverEdge = -1; TL.hoverKey = null; drawTimeline(); } });
 $("tl").addEventListener("pointerup", () => { tlDrag = false; if (RT) endRetime(false); if (KD) endKeyDrag(false); });
@@ -2342,6 +2506,7 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   stepJump(e.key === "ArrowLeft" ? -1 : 1);
 });
+$("testChip").onclick = () => { const si = stopIdx(), k = si >= 0 ? si : M.steps.findIndex((q) => q.skip); if (k >= 0) { selectStep(k, false); openTab("pane-step"); drawTimeline(); } };
 $("btnUndo").onclick = undo; $("btnRedo").onclick = redo;
 let lastTick = 0;
 function tick(now) {
@@ -2368,7 +2533,7 @@ function drawAt(t) {
   else {
     armDeg = p ? p.arm : f.aC; scDeg = p ? p.scoop : S.playing || JOG.dir ? f.sO : f.sC; x = p ? p.x : f.x;   // shake only shows while playing
     ghost = L ? { arm: L.aC, scoop: L.sC } : p ? (p.ghost || null) : { arm: f.aT, scoop: f.sT };
-    name = p ? "Preview · " + p.label : S.pin ? S.pin.label : (M.steps[f.i] ? M.steps[f.i].name : "DONE");
+    name = p ? "Preview · " + p.label : S.pin ? S.pin.label : f.rs ? "⏹ RESET · back to the start pose" : (M.steps[f.i] ? M.steps[f.i].name : "DONE");
   }
   $("hudStep").textContent = name;
   const note = !real && p && p.note ? p.note : "", hn = $("hudNote"); if (hn.textContent !== note) { hn.textContent = note; hn.hidden = !note; }
@@ -2547,10 +2712,10 @@ function initTwin() {
 $("viewSel").onchange = (e) => T3.ok && T3.setPreset(e.target.value);
 function setLock(on) {
   VIEW.locked = on; $("btnLock").setAttribute("aria-pressed", on); $("btnLock").textContent = on ? "View locked" : "Lock view";
-  $("stage").classList.toggle("locked", on); $("lockMsg").hidden = true; $("camHelp").hidden = on;
+  $("stage").classList.toggle("locked", on); $("revZoom").hidden = on;
 }
 let lockFlashT = 0;
-function flashLock() { const m = $("lockMsg"); m.hidden = false; clearTimeout(lockFlashT); lockFlashT = setTimeout(() => (m.hidden = true), 1800); flash($("btnLock")); }
+function flashLock() { clearTimeout(lockFlashT); flash($("btnLock")); }   // no text over the view: the Lock button flashes
 $("btnLock").onclick = () => setLock(!VIEW.locked);
 setLock(true);
 $("tiltIn").value = TW.tilt;
@@ -3066,10 +3231,14 @@ $("btnReset").onclick = (e) => {
     if (LIVE.limp || LIVE.cal) { liveSend(`M ${a.toFixed(1)} ${sc.toFixed(1)}`); LIVE.limp = false; LIVE.cal = false; CAL.on = { 1: false, 2: false, 3: false }; }
     else { liveSend("A " + a.toFixed(1)); liveSend("S " + sc.toFixed(1)); }
     liveSend("o 0 300");                            // slides in, gently
+    // Drives back to what you had picked (■ Stop / Limp drop Robot · live to Twin only). Following again
+    // starts quietly: the robot is already on its way here with smooth A / S / o moves, so no P jump now.
+    if (DRIVE.last === "live" && !FOL.on && liveReady()) { FOL.on = true; DRIVE.mode = "live"; logc("# robot follows the timeline again (Reset)"); }
+    else if (DRIVE.last === "upload" && DRIVE.mode !== "upload") { if (FOL.on) setFollow(false); DRIVE.mode = "upload"; }
     FOL.lastCmd = followCmd();                      // following: the robot is already being sent here
-    toast("Robot back to the start pose (A_START, S_START, slides 0 mm)");
+    toast(`Robot back to the start pose (A_START, S_START, slides 0 mm)${DRIVE.mode !== "twin" ? ` · Drives: ${DRIVE.mode === "live" ? "Robot · live" : "Robot · uploaded"}` : ""}`);
   } else toast("Twin back at the start");
-  drawAt(0); updBadge();
+  drawAt(0); updDriveUi(); setPlayUi(); updBadge();
 };
 $("btnLimp").onclick = (e) => {
   flash(e.currentTarget);
@@ -3177,7 +3346,7 @@ $("btnContinue").onclick = (e) => { flash(e.currentTarget); liveSend("n"); LIVE.
 // ============================================================================
 // DRIVES (what Play moves) and SCOPE (what Play plays)
 // ============================================================================
-const DRIVE = { mode: "twin" };   // twin | live (the robot copies the twin: FOL) | upload (Play runs the robot's own copy)
+const DRIVE = { mode: "twin", last: "twin" };   // twin | live (the robot copies the twin: FOL) | upload (Play runs the robot's own copy). last = what you picked (↺ Reset goes back to it)
 const UP = { active: null, pending: null, restoreStep: false };   // an uploaded run the editor started
 const PLAY = { scope: ["step", "from", "all"].includes(TW.scope) ? TW.scope : "all", cur: null };
 function setScope(sc) {
@@ -3197,9 +3366,10 @@ function updDriveUi() {
   if (c.hidden !== (DRIVE.mode !== "upload")) c.hidden = DRIVE.mode !== "upload";
 }
 function setDrive(mode) {
-  if (mode === DRIVE.mode) { updDriveUi(); return; }
+  if (mode === DRIVE.mode) { DRIVE.last = mode; updDriveUi(); return; }
   if (mode !== "twin" && !S.live) { toast("Connect the robot first (Connect robot, top right)."); updDriveUi(); return; }
   stopPlay(); UP.pending = null;
+  DRIVE.last = mode;
   if (mode === "live") { setFollow(true); }                                     // sets DRIVE.mode = live if the robot is ready
   else { if (FOL.on) setFollow(false); DRIVE.mode = mode; if (mode === "upload" && LIVE.fw && !liveRunning()) liveSend("k " + Math.round(S.rate * 100)); }
   updDriveUi(); setPlayUi(); updBadge();
@@ -3365,6 +3535,9 @@ function collectIssues() {
   const out = [], push = (sev, text, at) => out.push({ sev, text, ...(at || {}) });
   if (!SIM) return out;
   const seen = {}, endStop = cfgv("SLIDE_END_STOP_MM"), free = slideFreeSpeed(), pastEnd = {}, tooFast = {}, overNamed = {};
+  const skipped = M.steps.filter((q) => q.skip).map((q) => q.name), si = stopIdx();
+  if (si >= 0) push("warn", `Test flag: the run stops after ${M.steps[si].name} and goes back to the start pose (⏹). Clear it before the competition.`, { i: si, f: "flag" });
+  if (skipped.length) push("warn", `Test flag: ${skipped.join(", ")} ${skipped.length > 1 ? "are" : "is"} skipped (⊘): in the file, but not run. Clear before the competition.`, { i: M.steps.findIndex((q) => q.skip), f: "flag" });
   for (const n of FW_NAMES) if (!M.consts.some((c) => c.name === n)) push("err", `${n} is missing: the robot's code needs it (Robot_Controller_V2_1.ino won't compile). Add it in Angles & values.`);
   M.steps.forEach((s, i) => {
     const nm = s.name || `Step ${i}`;
@@ -3394,7 +3567,7 @@ function collectIssues() {
     }
     const w = stepWarning(i);
     if (w) push("warn", `${nm}: ${w}`, SIM.spill && SIM.spill.byStep[i] ? { i } : { i, f: "waitType" });
-    if (!SIM.spans.some((x) => x.i === i)) push("warn", `${nm} is never reached: the run ends before it.`, { i });
+    if (!SIM.spans.some((x) => x.i === i) && !notRunWhy(i)) push("warn", `${nm} is never reached: the run ends before it.`, { i });
   });
   for (const [name, o] of Object.entries(overNamed)) push("warn", `${name} (${fmtV(o.v)}°/s) is faster than the ${AX_LABEL[o.ax]} servo can go (about ${Math.round(o.o)}°/s): ${o.steps.map((k) => M.steps[k].name).join(", ")} ${o.steps.length > 1 ? "arrive" : "arrives"} later than the twin shows.`, M.consts.some((c) => c.name === name) ? { c: name } : { i: o.steps[0], f: AX_V[o.ax] });
   for (const [tok, o] of Object.entries(pastEnd)) push("warn", `${tok === String(+tok) ? tok + " mm" : `${tok} (${fmtV(o.v)} mm)`} is past the slide end stop (~${Math.round(endStop)} mm): ${o.steps.map((k) => M.steps[k].name).join(", ")} ${o.steps.length > 1 ? "end" : "ends"} in a stall.`, { i: o.steps[0], f: "slide" });
@@ -3405,6 +3578,13 @@ function collectIssues() {
 }
 function updIssues() {
   ISSUES = collectIssues();
+  const tc = $("testChip"), si = stopIdx(), nsk = M.steps.filter((q) => q.skip).length;
+  if (tc) {
+    const txt = si >= 0 || nsk ? `TEST${si >= 0 ? ` ⏹ ${M.steps[si].name}` : ""}${nsk ? ` ⊘ ${nsk}` : ""}` : "";
+    tc.title = (si >= 0 ? `The run stops after ${M.steps[si].name}, then goes back to the start pose. ` : "") + (nsk ? `${nsk} step${nsk > 1 ? "s" : ""} skipped. ` : "") + "Test flags, saved in Sequence.h: click to go to them; clear them before the competition.";
+    if (tc.textContent !== txt) tc.textContent = txt;
+    tc.hidden = !txt;
+  }
   const b = $("btnIssues"); if (!b) return;
   const e = ISSUES.filter((x) => x.sev === "err").length, w = ISSUES.length - e, pl = (n, s) => `${n} ${s}${n === 1 ? "" : "s"}`;
   const txt = e ? `✕ ${pl(e, "error")}${w ? " · " + pl(w, "warning") : ""}` : w ? `⚠ ${pl(w, "warning")}` : "✓ No issues";
@@ -3432,7 +3612,7 @@ function goIssue(it) {
   if (it.i === undefined || !M.steps[it.i]) return;
   if (stepSpan(it.i)) selectStep(it.i, "end"); else selectStep(it.i, false);
   openTab("pane-step");
-  const id = { arm: "i_arm", scoop: "i_scoop", slide: "i_slide", armV: "i_armV", scoopV: "i_scoopV", speed: "i_speed", waitType: "iWaitT", waitVal: "iWaitV", limit: "iLimit", name: "iName", vib: "iVibOn", armAcc: "i_arm_ad", armDec: "i_arm_ad", scoopAcc: "i_scoop_ad", scoopDec: "i_scoop_ad" }[it.f];
+  const id = { arm: "i_arm", scoop: "i_scoop", slide: "i_slide", armV: "i_armV", scoopV: "i_scoopV", speed: "i_speed", waitType: "iWaitT", waitVal: "iWaitV", limit: "iLimit", name: "iName", vib: "iVibOn", armAcc: "i_arm_ad", armDec: "i_arm_ad", scoopAcc: "i_scoop_ad", scoopDec: "i_scoop_ad", flag: "iStop" }[it.f];
   focusFlash(id && $(id));
   rowIntoDrawer(it.i);
 }

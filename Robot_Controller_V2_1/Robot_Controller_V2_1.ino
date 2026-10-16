@@ -93,6 +93,8 @@ bool slideUsed = false;           // a step of this run has commanded the slides
 bool slideDone = true;            // the slides' last move has arrived (latched until the next slide command)
 bool shortLogged = false;         // SETTLED_SHORT logged for this move
 bool fallbackUsed = false;
+bool resetting = false;           // a STEP_STOP row ended the run: going back to the start pose
+unsigned long resetMs = 0;
 bool waitingForGo = false;
 bool consoleMode = (RUN_MODE == RUN_CONSOLE);   // true = bench: wait for commands
 bool manualServos = false;                       // calibration: raw pulses, not degrees
@@ -201,6 +203,13 @@ uint8_t stateCode() {            // 0 IDLE, 1..N steps, N+1 DONE  (matches #STAT
 // =============================================================================
 void loadStep(uint8_t i, Step& s) { memcpy_P(&s, &SEQUENCE[i], sizeof(Step)); }
 
+// the next row that runs after row i (STEP_SKIP rows don't), 255 = none (end of the run)
+uint8_t __attribute__((noinline)) nextRunStep(int16_t i) {
+  for (int16_t k = i + 1; k <= (int16_t)lastStep; k++)
+    if (!(pgm_read_byte(&SEQUENCE[k].flags) & STEP_SKIP)) return (uint8_t)k;
+  return 255;
+}
+
 float slideSpeedFor(const Step& s) {
   return ((s.slideSpeed > 0.0f) ? s.slideSpeed : SLIDE_FAST) * speedK;
 }
@@ -223,9 +232,10 @@ void commandSlide(const Step& s, uint8_t i) {
 
   // exit speed: blend into the next row if it keeps the slides going the same way
   float vEnd = 0.0f;
-  if (!stepMode && (s.waitType == W_ARRIVED || s.waitType == W_SLIDE_DONE) && i < lastStep) {
+  const uint8_t ni = (s.flags & STEP_STOP) ? 255 : nextRunStep(i);
+  if (!stepMode && (s.waitType == W_ARRIVED || s.waitType == W_SLIDE_DONE) && ni != 255) {
     Step nx;
-    loadStep(i + 1, nx);
+    loadStep(ni, nx);
     if (!isHold(nx.slide)) {
       const float d1 = s.slide - pos, d2 = nx.slide - s.slide;
       if (d1 * d2 > 0.0f) {
@@ -382,8 +392,37 @@ void slideFault(const __FlashStringHelper* code) {
   }
 }
 
+void endManualServos(float armDeg, float scoopDeg);
+// console jogs and the STEP_STOP reset share these (flash): servos at half speed / quarter accel, slides at v mm/s
+void __attribute__((noinline)) jogServo(ServoAxis& ax, float speed, float acc, float dec, float deg) {
+  endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
+  ax.setLimits(speed * 0.5f, acc * 0.25f, dec * 0.25f);
+  ax.moveTo(deg);
+}
+void __attribute__((noinline)) slideGo(float mm, float v) {
+  slide.setProfileLimits(mmToCounts(v), mmToCounts(SLIDE_ACCEL), mmToCounts(SLIDE_DECEL));
+  slide.setTarget(mmToCounts(mm < 0.0f ? 0.0f : mm), SLIDE_MAX_PWM);
+  jogEndMs = 0;
+}
+
+// STEP_STOP: back to the start pose like the editor's Reset (servos at jog speed, slides to 0 at 300 mm/s), then DONE
+void __attribute__((noinline)) startReset() {
+  resetting = true;
+  resetMs = millis();
+  logEvent(F("STOP_HERE"), stepIndex);
+  scoop.stopVibration();
+  jogServo(arm, ARM_SPEED, ARM_ACCEL, ARM_DECEL, A_START);
+  jogServo(scoop, SCOOP_SPEED, SCOOP_ACCEL, SCOOP_DECEL, S_START);
+  slideGo(0.0f, 300.0f);
+}
+
 void updateRunner() {
   if (runState != R_RUNNING) return;
+
+  if (resetting) {   // done when the moves are (8 s at most), or the slides stall (zero not quite at the stop)
+    if ((armDone() && scoopDone() && slide.isProfileFinished()) || slideStalled || millis() - resetMs > 8000UL) finishRun();
+    return;
+  }
 
   if (slideUsed && !slideDone) {      // a slide move still on its way (it may have started in an earlier step)
     const unsigned long el = millis() - slideCmdMs;
@@ -397,13 +436,15 @@ void updateRunner() {
     logEvent(F("STEP_LIMIT"), stepIndex);
   }
 
-  if (stepIndex >= lastStep) { finishRun(); return; }
+  if (cur.flags & STEP_STOP) { startReset(); return; }
+  const uint8_t nx = nextRunStep(stepIndex);
+  if (nx == 255) { finishRun(); return; }
   if (stepMode) {
     runState = R_PAUSED;
     Serial.print(F("# paused after ")); printStepName(stepIndex); Serial.println(F(" - n = next, x = stop"));
     return;
   }
-  enterStep(stepIndex + 1);
+  enterStep(nx);
 }
 
 void startRun(uint8_t first) {
@@ -418,14 +459,18 @@ void startRun(uint8_t first) {
   slideTargetMm = slideMm();                       // wherever a jog left them
   digitalWrite(END_LED_PIN, LOW);
   runState = R_RUNNING;
+  resetting = false;
   logEvent(F("RUN_START"), first);
-  enterStep(first);
+  const uint8_t f = nextRunStep((int16_t)first - 1);   // a skipped first row: start at the next one
+  if (f == 255) { finishRun(); return; }
+  enterStep(f);
 }
 
 void printConfig();
 
 void finishRun() {
   runState = R_DONE;
+  resetting = false;
   slide.setMode(MotorController::COAST);
   scoop.stopVibration();
   arm.jumpTo(arm.getCommand());          // freeze anything cut short
@@ -434,8 +479,6 @@ void finishRun() {
   const unsigned long now = millis();
   Serial.print(F("S,")); Serial.print(now); Serial.print(F(",DONE,")); Serial.println(stateCode());
   Serial.print(F("R,")); Serial.print(now); Serial.print(','); Serial.println(now - runStartMs);
-  Serial.print(F("# run ")); Serial.print(now - runStartMs);
-  Serial.println(F(" ms (boot-to-DONE; add bootloader + reaction time)"));
   printConfig();
 }
 
@@ -634,9 +677,7 @@ void printConfig() {
 //                vib > 0 = shake +/- deg, 0 = stop shaking.
 //                Sent ~25 times a second while you scrub or play. No reply (keeps the link quiet).
 void printHelp() {
-  Serial.println(F("# x stop | g run | r <n> run from | t step mode | n next | k <pct> speed | l list | p cfg | b bench"));
-  Serial.println(F("# A <deg> arm | S <deg> scoop | Q pose | o <mm> [mm/s] | j <pwm> <ms> | z zero | c coast | v vib"));
-  Serial.println(F("# U <out> <us> pulse | L <out> limp (0 all) | M degrees again | P follow (editor)"));
+  Serial.println(F("# x g r<n> t n k<%> l p b | A S Q o j z c v | U L M P: see README.md"));   // (short: flash)
 }
 
 void enterBench() {
@@ -705,7 +746,8 @@ void processCommand(char* cmd) {
   }
   if (op == 'n' && runState == R_PAUSED) {
     runState = R_RUNNING;
-    if (stepIndex >= lastStep) finishRun(); else enterStep(stepIndex + 1);
+    const uint8_t nx = nextRunStep(stepIndex);
+    if (nx == 255) finishRun(); else enterStep(nx);
     return;
   }
   if (op == 't') { stepMode = !stepMode; logEvent(F("STEP_MODE"), stepMode); return; }
@@ -743,23 +785,16 @@ void processCommand(char* cmd) {
       break;
     }
     case 'A':
-      endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
-      arm.setLimits(ARM_SPEED * 0.5f, ARM_ACCEL * 0.25f, ARM_DECEL * 0.25f);      // jogs at half speed
-      arm.moveTo(a1);
+      jogServo(arm, ARM_SPEED, ARM_ACCEL, ARM_DECEL, a1);      // jogs at half speed
       logEvent(F("CMD_A"), (long)(a1 * 10));
       break;
     case 'S':
-      endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
-      scoop.setLimits(SCOOP_SPEED * 0.5f, SCOOP_ACCEL * 0.25f, SCOOP_DECEL * 0.25f);
-      scoop.moveTo(a1);
+      jogServo(scoop, SCOOP_SPEED, SCOOP_ACCEL, SCOOP_DECEL, a1);
       logEvent(F("CMD_S"), (long)(a1 * 10));
       break;
     case 'Q': printPose(); break;
     case 'o': {
-      const float v = (a2 > 0.0f) ? a2 : SLIDE_FAST;
-      slide.setProfileLimits(mmToCounts(v), mmToCounts(SLIDE_ACCEL), mmToCounts(SLIDE_DECEL));
-      slide.setTarget(mmToCounts(a1 < 0.0f ? 0.0f : a1), SLIDE_MAX_PWM);
-      jogEndMs = 0;
+      slideGo(a1, (a2 > 0.0f) ? a2 : SLIDE_FAST);
       logEvent(F("CMD_O"), (long)a1);
       break;
     }
@@ -874,7 +909,7 @@ void setup() {
   }
   if (WAIT_FOR_GO) {
     waitingForGo = true;
-    Serial.println(F("# WAIT_FOR_GO: holding start pose. g = run, ? = jog commands."));
+    Serial.println(F("# waiting: g = run"));
     return;
   }
   startRun(FIRST_STEP);

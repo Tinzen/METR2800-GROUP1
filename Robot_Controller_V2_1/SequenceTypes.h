@@ -7,6 +7,12 @@
 
 enum WaitType : uint8_t { W_MS = 0, W_ARRIVED = 1, W_ARM = 2, W_SLIDE = 3,
                           W_ARM_DONE = 4, W_SCOOP_DONE = 5, W_SLIDE_DONE = 6, W_SCOOP = 7 };
+// FLAG (last column, optional): STEP_RUN = normal; STEP_SKIP = this row doesn't run (testing, e.g. no vibrate);
+// STEP_STOP = the run ends after this row: the robot goes back to the start pose (A_START, S_START,
+// slides 0 mm) and stops (testing part of the run, e.g. only the intake).
+#define STEP_RUN   0
+#define STEP_SKIP  1
+#define STEP_STOP  2
 #define WAIT_MS(ms)              W_MS, (ms)           // next step after ms
 // "arrived" guards: + ms = wait that long after arriving; - ms = go that long BEFORE arriving (by the plan)
 #define WAIT_ARRIVED(ms)         W_ARRIVED, (ms)      // when EVERY axis has stopped (arm, scoop, slides; moves from earlier steps count), plus ms
@@ -38,4 +44,5 @@ struct Step {
   int16_t  waitValue;    // ms (arrived guards: negative = before arriving) or %
   uint16_t limitMs;      // OR AFTER: end the step after this long regardless (0 = no limit; missing = 0)
   uint8_t  armAccPct, armDecPct, scoopAccPct, scoopDecPct;   // % of the axis accel / decel (0 = 100)
+  uint8_t  flags;        // STEP_RUN / STEP_SKIP / STEP_STOP (missing = STEP_RUN)
 };

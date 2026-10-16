@@ -15,7 +15,7 @@ Files: `Sequence.h` (the table), `Robot_Controller_V2_1.ino` (the runner: `enter
 | Entry action | `enterStep(i)`: reads the row and **starts** the arm, scoop and slide moves and the vibration |
 | During action | Every `loop()`: servo profiles, slide PID (every 10 ms), safety monitors, telemetry |
 | Transition guard | The **NEXT WHEN** column, checked by `stepConditionMet()` every loop, **or** the row's **OR AFTER** time limit |
-| Next state | Always the **next row**. The only jumps are the fault transitions (section 4) |
+| Next state | The **next row** that isn't `STEP_SKIP` (`nextRunStep()`). Other jumps: the fault transitions (section 4), and `STEP_STOP` (the run ends after that row: back to the start pose, then DONE) |
 | Exit action | None. A move still running when its row ends **keeps going** (that's how steps overlap) |
 | Top-level states | `runState`: `R_IDLE` → `R_RUNNING` ⇄ `R_PAUSED` (step mode) → `R_DONE`. Plus `consoleMode` (bench): set by `b` within 150 ms of power-up (the editor's **Hold still**) or by `RUN_CONSOLE`; the robot then waits for commands instead of running |
 
@@ -56,7 +56,7 @@ else enterStep(stepIndex + 1);            // -> next state
 
 ## 3. What each column does (entry actions)
 
-`{ "NAME", ARM, deg/s, SCOOP, deg/s, SLIDE, SLIDE mm/s, VIBRATE, NEXT WHEN, OR AFTER, A.ACC%, A.DEC%, S.ACC%, S.DEC% }` (the last five may be left out: OR AFTER = 0 = no limit, the % = 100)
+`{ "NAME", ARM, deg/s, SCOOP, deg/s, SLIDE, SLIDE mm/s, VIBRATE, NEXT WHEN, OR AFTER, A.ACC%, A.DEC%, S.ACC%, S.DEC% }` (the last six may be left out: OR AFTER = 0 = no limit, the % = 100, FLAG = STEP_RUN)
 
 **Every move is a trapezoid motion profile** (speed up at the axis's `_ACCEL`, cruise, slow down at its `_DECEL`). There is no "instant" or "timed" mode any more (16 Oct): a fast move is just a profile with a high speed. With a different accel and decel the trapezoid is lopsided; a move too short to reach its speed peaks where the two ramps meet.
 
