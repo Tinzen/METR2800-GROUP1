@@ -6,13 +6,12 @@
 
 // One servo "axis" (the arm pair, or the scoop), in DEGREES.
 //
-// Three ways to move:
-//   moveTo(t)     profiled (smooth start/stop) at setLimits() speed/accel
-//   instantTo(t)  jump: send the target at once, the servo moves at its own
-//                 speed (V2 behaviour). Arrival is estimated from
-//                 setNativeSpeed() because a hobby servo can't report back.
-//   jumpTo(v)     set the command directly (the step runner uses this for
-//                 timed / coordinated moves it computes itself)
+// Two ways to move:
+//   moveTo(t)     profiled (smooth start/stop) at setLimits() speed/accel. Called while a
+//                 move is still running, it carries on from the current speed (or brakes
+//                 first if the new target is behind), so there is never a jerk.
+//   jumpTo(v)     set the command directly (the editor's follow-the-timeline stream)
+// A hobby servo can't report back: "finished" means the profile finished.
 //
 // The writer callback converts degrees to pulse widths (calibration lives
 // in the .ino), so this class knows nothing about microseconds.
@@ -23,12 +22,10 @@ class ServoAxis {
     ServoAxis(ServoWriteFn writer, float minDeg, float maxDeg);
 
     void setLimits(float maxVelocity, float maxAcceleration);  // deg/s, deg/s^2
-    void setNativeSpeed(float degPerSec);                        // for instantTo()
     void setWriteInterval(unsigned long ms);
 
     void begin(float startDeg);       // write now, no motion
     void moveTo(float targetDeg);
-    void instantTo(float targetDeg);
     void jumpTo(float deg);
 
     void startVibration(float amplitudeDeg, unsigned int halfPeriodMs);
@@ -36,7 +33,7 @@ class ServoAxis {
 
     void update();                    // call every loop()
 
-    bool isFinished() const;          // move complete (estimated for instantTo)
+    bool isFinished() const;          // profile complete
     float getProgress() const;        // 0..1 of the current move
     bool isVibrating() const;
     float getTarget() const;
@@ -44,18 +41,14 @@ class ServoAxis {
     float getOutput() const;          // last value written (incl. vibration)
 
   private:
-    enum Mode { IDLE, PROFILE, INSTANT };
+    enum Mode { IDLE, PROFILE };
     ServoWriteFn writeFn;
     MotionProfile profile;
     float minVal, maxVal;
-    float nativeSpeed;
 
     Mode mode;
     float target;
     float command;
-    float instantFrom;
-    unsigned long instantStartMs;
-    unsigned long instantDurMs;
 
     float lastWritten;
     unsigned long lastWriteMs;

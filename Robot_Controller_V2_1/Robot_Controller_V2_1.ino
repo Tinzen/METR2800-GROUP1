@@ -12,8 +12,10 @@
 // Tune the sequence in tools/sequence_editor.html; calibrate with calibration/.
 //
 // Default sequence (V2 intake, V1 transfer, profiled outtake):
-//   SCOOP_DOWN ARM_DOWN SWEEP PICKUP | LIFT CARRY POUR VIBRATE |
+//   IDLE SCOOP_DOWN ARM_DOWN SWEEP_UP SWEEP_DOWN WAIT PICKUP | LIFT CARRY POUR VIBRATE |
 //   EXTEND CREEP TIP_HOLD RETRACT | DONE
+// Every arm, scoop and slide move is a trapezoid motion profile. Servos are open loop:
+// "arrived" means their profile finished.
 // =============================================================================
 
 #include <Wire.h>
@@ -25,10 +27,15 @@
 // =============================================================================
 // TEST SETTINGS  (change these for bench work)
 // =============================================================================
-//   RUN_FULL     competition: runs the sequence on power-up
-//   RUN_CONSOLE  waits for serial commands (jog, single steps, live link). Type ?
+//   RUN_FULL     competition: runs the sequence on power-up. Leave it like this:
+//                the sequence editor can still hold the robot still. At every
+//                power-up the robot waits BENCH_WINDOW_MS for a computer to send
+//                'b' (bench). The editor does that when you click Connect; with
+//                no computer attached (competition) it runs as normal.
+//   RUN_CONSOLE  always waits for serial commands (jog, single steps). Type ?
 enum RunMode { RUN_FULL = 0, RUN_CONSOLE = 1 };
 const RunMode RUN_MODE = RUN_FULL;
+const unsigned long BENCH_WINDOW_MS = 150;   // added to every power-up
 
 // true = after boot, hold the start pose and wait for 'g' (USB resets the Nano
 // every time the port opens). MUST be false at competition.
@@ -84,15 +91,8 @@ float speedK = SPEED_PCT_AT_BOOT / 100.0f;
 bool armMovedThisStep = false, scoopMovedThisStep = false, slideMovedThisStep = false;
 bool fallbackUsed = false;
 bool waitingForGo = false;
-
-struct TimedMove {               // MOVE = ms: the axis is interpolated by time
-  bool active;                   // (one per axis, so a later step that only moves
-  unsigned long t0, dur;         //  the scoop doesn't stop the arm's move)
-  float from, to, via;
-  bool viaOn;
-  float p;
-};
-TimedMove tmArm = {}, tmScoop = {};
+bool consoleMode = (RUN_MODE == RUN_CONSOLE);   // true = bench: wait for commands
+bool manualServos = false;                       // calibration: raw pulses, not degrees
 
 // slides (mm in the sequence, counts in the controller)
 float slideTargetMm = 0.0f;
@@ -104,7 +104,7 @@ unsigned long stallSinceMs = 0, dirBadSinceMs = 0, settledSinceMs = 0, jogEndMs 
 bool servoDriverOk = true;
 
 unsigned long lastLogMs = 0, loopMaxUs = 0;
-char cmdBuf[28];
+char cmdBuf[40];                  // longest command: P <arm> <scoop> <mm> <mm/s> <vib>
 uint8_t cmdLen = 0;
 
 // =============================================================================
@@ -166,10 +166,11 @@ float armLUs(float deg)  { return ARM_L_CAL_US + ARM_L_DIR * ARM_US_PER_DEG * (d
 float scoopUs(float deg) { return SCOOP_CAL_US + SCOOP_DIR * SCOOP_US_PER_DEG * (deg - CAL_SCOOP_DEG); }
 
 void writeArm(float deg) {
+  if (manualServos) return;
   writeServoUs(ARM_R_OUTPUT, armRUs(deg));
   writeServoUs(ARM_L_OUTPUT, armLUs(deg));
 }
-void writeScoop(float deg) { writeServoUs(SCOOP_OUTPUT, scoopUs(deg)); }
+void writeScoop(float deg) { if (!manualServos) writeServoUs(SCOOP_OUTPUT, scoopUs(deg)); }
 
 // =============================================================================
 // LOGGING HELPERS
@@ -193,61 +194,18 @@ uint8_t stateCode() {            // 0 IDLE, 1..N steps, N+1 DONE  (matches #STAT
 }
 
 // =============================================================================
-// TIMED MOVES
-// =============================================================================
-float easeProgress(float u) {
-  if (u <= 0.0f) return 0.0f;
-  if (u >= 1.0f) return 1.0f;
-  float e = TIMED_MOVE_EASE;
-  if (e <= 0.001f) return u;
-  if (e > 0.5f) e = 0.5f;
-  const float vp = 1.0f / (1.0f - e);
-  if (u < e) return 0.5f * vp * u * u / e;
-  if (u < 1.0f - e) return 0.5f * vp * e + vp * (u - e);
-  const float r = 1.0f - u;
-  return 1.0f - 0.5f * vp * r * r / e;
-}
-
-void updateTimedMove(TimedMove& m, ServoAxis& ax) {
-  if (!m.active) return;
-  float u = (float)(millis() - m.t0) / (float)m.dur;
-  if (u > 1.0f) u = 1.0f;
-  const float p = easeProgress(u);
-  m.p = p;
-  float v;
-  if (m.viaOn) v = (p < 0.5f) ? m.from + (m.via - m.from) * (p / 0.5f)
-                              : m.via + (m.to - m.via) * ((p - 0.5f) / 0.5f);
-  else v = m.from + (m.to - m.from) * p;
-  ax.jumpTo(v);
-  if (u >= 1.0f) m.active = false;
-}
-
-void startTimedMove(TimedMove& m, ServoAxis& ax, float to, float via, unsigned long dur) {
-  m.active = true;
-  m.t0 = stepStartMs;
-  m.dur = dur < 1 ? 1 : dur;
-  m.from = ax.getCommand();
-  m.to = to;
-  m.viaOn = !isHold(via);
-  m.via = via;
-  m.p = 0.0f;
-}
-
-// =============================================================================
 // STEP RUNNER
 // =============================================================================
 void loadStep(uint8_t i, Step& s) { memcpy_P(&s, &SEQUENCE[i], sizeof(Step)); }
 
 float slideSpeedFor(const Step& s) {
-  float v = (s.slideSpeed > 0.0f) ? s.slideSpeed : SLIDE_MAX;
-  if (v > SLIDE_MAX) v = SLIDE_MAX;
-  return v * speedK;
+  return ((s.slideSpeed > 0.0f) ? s.slideSpeed : SLIDE_FAST) * speedK;
 }
 
 void commandSlide(const Step& s, uint8_t i) {
   const float pos = slideMm();
   const float speed = slideSpeedFor(s);
-  const float accel = SLIDE_ACCEL * speedK * speedK;
+  const float accel = ((s.slideSpeed == SLIDE_RETRACT_SPEED) ? SLIDE_RETRACT_ACCEL : SLIDE_ACCEL) * speedK * speedK;
 
   // entry speed: handed over by the previous step (fast -> creep blend).
   // Step mode pauses between steps, so it never blends.
@@ -255,7 +213,7 @@ void commandSlide(const Step& s, uint8_t i) {
 
   // exit speed: blend into the next row if it keeps the slides going the same way
   float vEnd = 0.0f;
-  if (!stepMode && s.waitType == W_ARRIVED && i < lastStep) {
+  if (!stepMode && (s.waitType == W_ARRIVED || s.waitType == W_SLIDE_DONE) && i < lastStep) {
     Step nx;
     loadStep(i + 1, nx);
     if (!isHold(nx.slide)) {
@@ -290,21 +248,16 @@ void enterStep(uint8_t i) {
   printStepName(i); Serial.print(','); Serial.println(stateCode());
 
   // ---- servos -------------------------------------------------------------
-  // An axis this row moves drops whatever it was doing; HOLD axes carry on.
-  if (armMovedThisStep) tmArm.active = false;
-  if (scoopMovedThisStep) tmScoop.active = false;
-  if (cur.move > 0) {
-    const unsigned long dur = (unsigned long)(cur.move / speedK);
-    if (armMovedThisStep) startTimedMove(tmArm, arm, cur.arm, cur.armVia, dur);
-    if (scoopMovedThisStep) startTimedMove(tmScoop, scoop, cur.scoop, NONE, dur);
-  } else if (cur.move == INSTANT) {
-    if (armMovedThisStep) arm.instantTo(cur.arm);
-    if (scoopMovedThisStep) scoop.instantTo(cur.scoop);
-  } else {
-    arm.setLimits(ARM_SPEED * speedK, ARM_ACCEL * speedK * speedK);
-    scoop.setLimits(SCOOP_SPEED * speedK, SCOOP_ACCEL * speedK * speedK);
-    if (armMovedThisStep) arm.moveTo(cur.arm);
-    if (scoopMovedThisStep) scoop.moveTo(cur.scoop);
+  // An axis this row moves gets a new profile, starting from where it is and how fast it is
+  // going (a move still running is taken over smoothly). HOLD axes carry on.
+  const float k2 = speedK * speedK;
+  if (armMovedThisStep) {
+    arm.setLimits(((cur.armSpeed > 0.0f) ? cur.armSpeed : ARM_SPEED) * speedK, ARM_ACCEL * k2);
+    arm.moveTo(cur.arm);
+  }
+  if (scoopMovedThisStep) {
+    scoop.setLimits(((cur.scoopSpeed > 0.0f) ? cur.scoopSpeed : SCOOP_SPEED) * speedK, SCOOP_ACCEL * k2);
+    scoop.moveTo(cur.scoop);
   }
 
   if (cur.vibrate > 0.0f) {
@@ -332,9 +285,9 @@ bool slideArrived() {
   return false;
 }
 
-bool armDone()   { return tmArm.active ? false : arm.isFinished(); }
-bool scoopDone() { return tmScoop.active ? false : scoop.isFinished(); }
-float armProgress() { return tmArm.active ? tmArm.p : arm.getProgress(); }
+bool armDone()   { return arm.isFinished(); }
+bool scoopDone() { return scoop.isFinished(); }
+float armProgress() { return arm.getProgress(); }
 
 bool stepConditionMet() {
   const unsigned long now = millis();
@@ -343,16 +296,25 @@ bool stepConditionMet() {
   switch (cur.waitType) {
     case W_MS:
       return el >= wv;
-    case W_ARRIVED: {
-      const bool all = (!armMovedThisStep || armDone()) &&
-                       (!scoopMovedThisStep || scoopDone()) &&
-                       (!slideMovedThisStep || slideArrived());
+    case W_ARRIVED:
+    case W_ARM_DONE:
+    case W_SCOOP_DONE:
+    case W_SLIDE_DONE: {
+      // all = every axis this row moved; or just the one axis named (its move may have started earlier)
+      const bool all =
+        (cur.waitType == W_ARM_DONE)   ? armDone() :
+        (cur.waitType == W_SCOOP_DONE) ? scoopDone() :
+        (cur.waitType == W_SLIDE_DONE) ? slideArrived() :
+        ((!armMovedThisStep || armDone()) && (!scoopMovedThisStep || scoopDone()) &&
+         (!slideMovedThisStep || slideArrived()));
       if (!all) { arrivedAtMs = 0; return false; }
       if (arrivedAtMs == 0) arrivedAtMs = now | 1UL;
       return (now - arrivedAtMs) >= wv;
     }
     case W_ARM:
       return armProgress() * 100.0f >= cur.waitValue;
+    case W_SCOOP:
+      return scoop.getProgress() * 100.0f >= cur.waitValue;
     case W_SLIDE:
       if (!slideMovedThisStep) return true;
       return slide.getProfileProgress() * 100.0f >= cur.waitValue;
@@ -387,8 +349,6 @@ void slideFault(const __FlashStringHelper* code) {
 
 void updateRunner() {
   if (runState != R_RUNNING) return;
-  updateTimedMove(tmArm, arm);
-  updateTimedMove(tmScoop, scoop);
 
   if (slideMovedThisStep) {
     const unsigned long el = millis() - stepStartMs;
@@ -424,7 +384,6 @@ void printConfig();
 
 void finishRun() {
   runState = R_DONE;
-  tmArm.active = tmScoop.active = false;
   slide.setMode(MotorController::COAST);
   scoop.stopVibration();
   arm.jumpTo(arm.getCommand());          // freeze anything cut short
@@ -442,7 +401,6 @@ void stopEverything() {
   slide.setMode(MotorController::COAST);
   jogEndMs = 0;
   scoop.stopVibration();
-  tmArm.active = tmScoop.active = false;
 }
 
 // =============================================================================
@@ -500,13 +458,13 @@ void updateSlideMonitors() {
 // TELEMETRY
 // =============================================================================
 //   D,t,st,ph,aT,aC,sT,sC,sO,oT,oS,oP,oV,oPWM,oFF,fl,lm   (same columns as before)
-//     st   0 IDLE, 1..N = step (see #STATES), N+1 DONE    ph  1 = timed move active
+//     st   0 IDLE, 1..N = step (see #STATES), N+1 DONE    ph  always 0 (was: timed move active)
 //     aT/aC arm target / position as 0-1000 (650 = vertical, 5 per deg)
 //     sT/sC/sO scoop target / position / output, us-equivalent (2300 = 0 deg, 6.667 per deg)
 //     oT/oS/oP/oV slide target / setpoint / position (counts) / velocity (counts/s)
 //     oPWM, oFF  motor command and its feedforward part
 //     fl   bit0 arm moving, 1 scoop moving, 2 slide profiling, 3 vibrating,
-//          4 stalled, 5 timed move, 6 coast, 7 open loop
+//          4 stalled, 5 unused, 6 coast, 7 open loop
 //   S,t,STEP,code   step change     E,t,CODE,value   event     R,t,run_ms   finished
 static inline void field(long v) { Serial.print(','); Serial.print(v); }
 inline long logArm(float d) { return lround(LOG_ARM_ZERO - d * LOG_ARM_PER_DEG); }
@@ -520,19 +478,18 @@ void logTelemetry() {
 
   const MotorController::MotorMode mode = slide.getMode();
   uint8_t fl = 0;
-  if (!arm.isFinished() || tmArm.active)     fl |= 1;
-  if (!scoop.isFinished() || tmScoop.active) fl |= 2;
+  if (!arm.isFinished())            fl |= 1;
+  if (!scoop.isFinished())          fl |= 2;
   if (!slide.isProfileFinished())   fl |= 4;
   if (scoop.isVibrating())          fl |= 8;
   if (slideStalled)                 fl |= 16;
-  if (tmArm.active || tmScoop.active) fl |= 32;
   if (mode == MotorController::COAST)     fl |= 64;
   if (mode == MotorController::OPEN_LOOP) fl |= 128;
 
   Serial.print('D');
   field((long)now);
   field(stateCode());
-  field((tmArm.active || tmScoop.active) ? 1 : 0);
+  field(0);
   field(logArm(arm.getTarget()));
   field(logArm(arm.getCommand()));
   field(logScoop(scoop.getTarget()));
@@ -581,7 +538,7 @@ static void cfgF(const __FlashStringHelper* k, float v) {
 }
 
 void printConfig() {
-  cfgF(F("RUN_MODE"), RUN_MODE);
+  cfgF(F("RUN_MODE"), consoleMode);
   cfgF(F("SPEED_PCT"), speedK * 100.0f);
   // keys the run viewer uses to turn the log columns into degrees / mm
   cfgF(F("ARM_VERTICAL_POS"), LOG_ARM_ZERO);
@@ -625,9 +582,34 @@ void printConfig() {
 //   Q            print pose: #POSE,arm,scoop,slide_mm
 //   o <mm> [mm/s] slide to mm (profiled)     j <pwm> <ms>  open-loop slide jog
 //   z            zero slide encoder here     c         coast slide     v  toggle vibration
+//   b            bench: stop, then wait for commands (also the power-up handshake)
+// Servo calibration (sequence editor > Calibrate servos):
+//   U <out> <us> raw pulse on PCA output 1-3  L <out>   limp (0 = all)
+//   M [arm] [scoop]  back to degree control, holding that pose (default: the reference pose)
+// Follow the editor's timeline (sequence editor > Robot follows timeline):
+//   P <arm> <scoop> <mm> <mm/s> <vib>  servos straight to these angles (own speed),
+//                slides re-planned toward mm, arriving at mm/s (mm < 0 = slides untouched);
+//                vib > 0 = shake +/- deg, 0 = stop shaking.
+//                Sent ~25 times a second while you scrub or play. No reply (keeps the link quiet).
 void printHelp() {
-  Serial.println(F("# x stop | g run | r <n> run from | t step mode | n next | k <pct> speed | l list | p cfg"));
+  Serial.println(F("# x stop | g run | r <n> run from | t step mode | n next | k <pct> speed | l list | p cfg | b bench"));
   Serial.println(F("# A <deg> arm | S <deg> scoop | Q pose | o <mm> [mm/s] | j <pwm> <ms> | z zero | c coast | v vib"));
+  Serial.println(F("# U <out> <us> pulse | L <out> limp (0 all) | M degrees again | P follow (editor)"));
+}
+
+void enterBench() {
+  waitingForGo = false;
+  consoleMode = true;
+  Serial.println(F("#MODE,1"));
+}
+
+// Back to degree control after calibration. The servos are near the reference pose
+// then, so start the axes there (no jump back to wherever they were before).
+void endManualServos(float armDeg, float scoopDeg) {
+  if (!manualServos) return;
+  manualServos = false;
+  arm.begin(armDeg);
+  scoop.begin(scoopDeg);
 }
 
 void listSteps() {
@@ -665,9 +647,13 @@ void processCommand(char* cmd) {
   while (*cmd == ' ') cmd++;
   const char op = cmd[0];
   char* p = cmd + 1;
-  bool hasA1, hasA2;
+  bool hasA1, hasA2, ok;
   const float a1 = parseNum(p, hasA1);
   const float a2 = parseNum(p, hasA2);
+  const float a3m = parseNum(p, ok);     // P only (missing mm = -1: slides untouched; others 0)
+  const float a3 = ok ? a3m : -1.0f;
+  const float a4 = parseNum(p, ok);
+  const float a5 = parseNum(p, ok);
 
   if (op == 'x') {
     stopEverything();
@@ -681,9 +667,15 @@ void processCommand(char* cmd) {
     return;
   }
   if (op == 't') { stepMode = !stepMode; logEvent(F("STEP_MODE"), stepMode); return; }
+  if (op == 'b') {                       // bench: stop whatever is happening, then wait
+    stopEverything();
+    if (runState == R_RUNNING || runState == R_PAUSED) finishRun();
+    enterBench();
+    return;
+  }
 
   const bool idle = (runState == R_IDLE || runState == R_DONE);
-  const bool consoleOk = (RUN_MODE == RUN_CONSOLE) || waitingForGo;
+  const bool consoleOk = consoleMode || waitingForGo || runState == R_DONE;   // after a run: jog OK
   if (op == 'g' && idle && consoleOk) {
     waitingForGo = false;
     startRun(FIRST_STEP);
@@ -691,7 +683,7 @@ void processCommand(char* cmd) {
   }
   if (!idle) { Serial.println(F("# busy: x to stop")); return; }
   if (!consoleOk) return;              // competition run finished: ignore
-  if ((op == 'A' || op == 'S' || op == 'o' || op == 'j' || op == 'k' || op == 'r') && !hasA1) {
+  if ((op == 'A' || op == 'S' || op == 'o' || op == 'j' || op == 'k' || op == 'r' || op == 'U' || op == 'L' || op == 'P') && !hasA1) {
     Serial.println(F("# needs a number, ? for help"));
     return;
   }
@@ -699,7 +691,7 @@ void processCommand(char* cmd) {
     case '?': printHelp(); break;
     case 'p': printConfig(); break;
     case 'l': listSteps(); break;
-    case 'r': waitingForGo = false; startRun((uint8_t)a1); break;
+    case 'r': waitingForGo = false; endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG); startRun((uint8_t)a1); break;
     case 'k': {
       float k = a1 / 100.0f;
       if (k < 0.05f) k = 0.05f;
@@ -709,11 +701,13 @@ void processCommand(char* cmd) {
       break;
     }
     case 'A':
+      endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
       arm.setLimits(ARM_SPEED * 0.5f, ARM_ACCEL * 0.25f);      // jogs at half speed
       arm.moveTo(a1);
       logEvent(F("CMD_A"), (long)(a1 * 10));
       break;
     case 'S':
+      endManualServos(CAL_ARM_DEG, CAL_SCOOP_DEG);
       scoop.setLimits(SCOOP_SPEED * 0.5f, SCOOP_ACCEL * 0.25f);
       scoop.moveTo(a1);
       logEvent(F("CMD_S"), (long)(a1 * 10));
@@ -741,6 +735,37 @@ void processCommand(char* cmd) {
       else scoop.startVibration(VIBRATE_DEG, VIBRATE_HALF_PERIOD_MS);
       logEvent(F("CMD_V"), scoop.isVibrating());
       break;
+    case 'U':                            // raw pulse: U <output 1-3> <us>
+      if (a1 < 1 || a1 > 3 || !hasA2) { Serial.println(F("# U <1-3> <us>")); break; }
+      manualServos = true;
+      writeServoUs((int)a1, a2);
+      logEvent(F("CMD_U"), (long)a1 * 10000L + (long)a2);
+      break;
+    case 'L':                            // limp: L <output 1-3>, 0 = all
+      manualServos = true;
+      for (uint8_t o = 1; o <= 3; o++) if (a1 == 0 || a1 == o) pcaSetPulse(o - 1, 4096);   // full-off bit
+      logEvent(F("CMD_L"), (long)a1);
+      break;
+    case 'M': endManualServos(hasA1 ? a1 : CAL_ARM_DEG, hasA2 ? a2 : CAL_SCOOP_DEG); logEvent(F("CMD_M"), 0); break;
+    case 'P': {                          // follow the editor's timeline (see the list above)
+      endManualServos(a1, a2);
+      arm.jumpTo(a1);                    // the servos move at their own speed (the editor allows for it)
+      scoop.jumpTo(a2);
+      if (a3 >= 0.0f) {                  // mm < 0 = leave the slides alone
+        const float tgt = mmToCounts(a3);
+        if (fabs(tgt - slide.getTarget()) > 1.0f) {        // re-plan only when the target moved
+          const float dir = tgt - slide.getPosition();
+          float pv = (slide.getMode() == MotorController::ACTIVE) ? slide.getProfileVelocity() * dir : 0.0f;
+          float ev = mmToCounts(a4) * dir;                // > 0 = same way as the move
+          slide.setProfileLimits(mmToCounts(SLIDE_RETRACT_SPEED), mmToCounts(SLIDE_RETRACT_ACCEL));
+          slide.setTargetBlend(tgt, SLIDE_MAX_PWM, pv > 0.0f ? pv / fabs(dir) : 0.0f, ev > 0.0f ? ev / fabs(dir) : 0.0f);
+          jogEndMs = 0;
+        }
+      }
+      if (a5 > 0.0f) { if (!scoop.isVibrating()) scoop.startVibration(a5, VIBRATE_HALF_PERIOD_MS); }
+      else scoop.stopVibration();
+      break;
+    }
     default: Serial.println(F("# ? for help")); break;
   }
 }
@@ -775,6 +800,14 @@ void configureSlide() {
 void setup() {
   Serial.begin(SERIAL_BAUD);
   printHeader();
+  if (!consoleMode) {                         // power-up handshake: a computer may ask for bench
+    Serial.flush();
+    const unsigned long t0 = millis();
+    while (millis() - t0 < BENCH_WINDOW_MS) {
+      if (Serial.available() > 0 && Serial.read() == 'b') { consoleMode = true; break; }
+    }
+  }
+  if (consoleMode) Serial.println(F("#MODE,1"));
   pinMode(END_LED_PIN, OUTPUT);
   digitalWrite(END_LED_PIN, LOW);
 
@@ -785,15 +818,13 @@ void setup() {
 
   arm.setWriteInterval(SERVO_WRITE_INTERVAL_MS);
   scoop.setWriteInterval(SERVO_WRITE_INTERVAL_MS);
-  arm.setNativeSpeed(SERVO_NATIVE_DEG_S / ARM_GEAR_RATIO);
-  scoop.setNativeSpeed(SERVO_NATIVE_DEG_S);
   arm.begin(A_START);                         // power-on pose (robot is set up here)
   scoop.begin(S_START);
   configureSlide();
 
-  if (!servoDriverOk && RUN_MODE == RUN_FULL) { finishRun(); return; }
+  if (!servoDriverOk && !consoleMode) { finishRun(); return; }
 
-  if (RUN_MODE == RUN_CONSOLE) {
+  if (consoleMode) {
     printConfig();
     listSteps();
     printHelp();

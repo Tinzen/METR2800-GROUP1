@@ -27,8 +27,8 @@ These lines appear **live in the black window (or Serial Monitor) after every mo
 |---|---|---|
 | **peak lag** | Biggest gap between where the profile wants the slide and where it is, during the move | Small (a few mm). Large = too slow to follow: raise `kv`, or lower `vel` / `acc`. |
 | **overshoot** | How far it went past the target | Close to 0 |
-| **settle** | Time after the profile ends until it's within ±3 mm and stays there | Close to 0 s. `NEVER` = it never got within 3 mm. |
-| **final err** | Distance from the target when the move finished | Under 3 mm |
+| **settle** | Time after the profile ends until it's within ±1.7 mm (`SETTLE_MM`) and stays there | Close to 0 s. `NEVER` = it never got within 1.7 mm. |
+| **final err** | Distance from the target when the move finished | Under 2 mm |
 | **rise** (step only) | Time to go from 10% to 90% of the way | Shorter = more responsive |
 
 ## Other commands
@@ -38,7 +38,7 @@ These lines appear **live in the black window (or Serial Monitor) after every mo
 | `z` | Zero here (fully retracted) |
 | `m 100` / `r` | Move to 100 mm / back to 0 |
 | `kp ki kd ks kv ka kg <value>` | Change a gain, e.g. `kp 0.6` |
-| `vel 600` / `acc 3000` | Profile speed (mm/s) / acceleration (mm/s²) |
+| `vel 400` / `acc 1500` | Profile speed (mm/s) / acceleration (mm/s²) |
 | `g` | Show the gains and print lines to paste into `Robot_Controller_V2_1.ino` |
 | `d` | Switch output: raw data (Python) ↔ readable mm (Serial Monitor) |
 | `x` | **STOP** |
@@ -47,7 +47,7 @@ Gain changes apply immediately (even mid-test) and are **lost on restart**. Use 
 
 ## What each gain does
 
-The motor command each moment is **PID + feedforward**. All gains are per encoder count (1 count = 0.53 mm), the same as V2_1.
+The motor command each moment is **PID + feedforward**. All gains are per encoder count (1 count = 0.2954 mm with the 1:1 gearing), the same as V2_1.
 
 | Gain | Kind | What it does | Too low | Too high |
 |---|---|---|---|---|
@@ -62,7 +62,7 @@ The motor command each moment is **PID + feedforward**. All gains are per encode
 ## Tuning order (about 15 minutes)
 
 0. **Find `kg` and `ks` first** with the jog method in `Slide_Test/README.md` (this sketch has no jog command). Type them here, e.g. `kg 20`, `ks 10`.
-1. **Setup:** retract fully, `z`, then `vel 600`, `acc 3000` (or your target speeds).
+1. **Setup:** retract fully, `z`, then `vel 400`, `acc 1500` (or your target speeds).
 2. **Baseline:** `b 50 400 3`. Write down the result line.
 3. **`kv` first** (gets the slide moving at the right speed). If `peak lag` is large, raise `kv` in steps of 0.01 until lag stops improving or it starts running ahead.
 4. **`ks`** (stopping short). If `final err` is consistently a few mm, raise `ks` in steps of 5.

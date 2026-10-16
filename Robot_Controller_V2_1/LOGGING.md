@@ -89,6 +89,8 @@ const bool WAIT_FOR_GO = true;     // bench: wait for 'g' instead of starting on
 
 > **Competition:** put `WAIT_FOR_GO` back to **`false`**, or the robot will sit waiting for a `g` that never comes.
 
+(The sequence editor doesn't need this: its **Hold still** option stops the run on connect. The logger can't do that, so it needs `WAIT_FOR_GO`.)
+
 Upload the sketch in the Arduino IDE, then **close the Arduino Serial Monitor** (and Serial Plotter). Only one program can use the port at a time; this includes the sequence editor's live link.
 
 ### Every run

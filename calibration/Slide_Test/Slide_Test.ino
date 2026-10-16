@@ -12,7 +12,7 @@
 //
 // UNITS: everything you type is in mm (positions), mm/s (vel), mm/s^2 (acc),
 // measured from where you last typed 'z'. Internally the code uses encoder
-// ticks: 1 tick = MM_PER_TICK mm (0.532 mm, 36.15 mm spool, 1.8:1 step-up).
+// ticks: 1 tick = MM_PER_TICK mm (0.2954 mm, 36.15 mm spool, 1:1 gearing).
 //
 // Commands (type ? for this list):
 //   m <mm> [vel] [acc]   smooth move TO a position, e.g. m 150  or  m 150 500 2000
@@ -51,25 +51,25 @@ const int OUTTAKE_ENCODER_DIRECTION = -1;  // -1: raw count went DOWN when exten
 const int OUTTAKE_MOTOR_DIRECTION = 1;     // + PWM must EXTEND
 
 // ---------------- units ----------------
-// goBILDA 435 rpm: 384.5 ticks per gearbox rev. 1.8:1 step-up -> 213.6 ticks
+// goBILDA 435 rpm: 384.5 ticks per gearbox rev. 1:1 to the spool (16 Oct; was 1.8:1) -> 384.5 ticks
 // per spool rev. Spool 36.15 mm -> 113.57 mm per spool rev.
 // Assumes slide travel = cable pulled off the spool. Check with a ruler.
-const float MM_PER_TICK = 3.14159265f * 36.15f / (384.5f / 1.8f);   // 0.5317
+const float MM_PER_TICK = 3.14159265f * 36.15f / 384.5f;   // 0.2954
 float toMm(float ticks) { return ticks * MM_PER_TICK; }
 float toTicks(float mm) { return mm / MM_PER_TICK; }
 
 // ---------------- starting values ----------------
 // SPEED / ACCELERATION: edit the mm numbers here to change the start-up
 // defaults, or change them live with 'vel' / 'acc' (lost on restart).
-const float DEFAULT_VEL_MM_S  = 300.0f;    // mm/s
-const float DEFAULT_ACC_MM_S2 = 1000.0f;   // mm/s^2
+const float DEFAULT_VEL_MM_S  = 167.0f;    // mm/s   (16 Oct: was 300 at the old scale, same motor speed)
+const float DEFAULT_ACC_MM_S2 = 556.0f;    // mm/s^2 (was 1000)
 // No travel limit: moves go wherever you ask (only targets below 0 are
 // clamped to 0). The stall cut-out is the only protection at the far end.
 float kP = 0.4f, kI = 0.0f, kD = 0.0f;
 float kS = 12.0f, kV = 0.09f, kA = 0.0f, kG = 0.0f;
 float maxVel = toTicks(DEFAULT_VEL_MM_S);    // stored in ticks/s
 float maxAcc = toTicks(DEFAULT_ACC_MM_S2);   // stored in ticks/s^2
-float extendTicks = toTicks(250.0f); // 'ext' PLACEHOLDER - set to where the bucket tips
+float extendTicks = toTicks(139.0f); // 'ext' PLACEHOLDER (was 250) - set to where the bucket tips
 bool rawData = true;                 // 'd' toggles: true = D lines for Python
 
 const int MAX_PWM = 250;               // during moves

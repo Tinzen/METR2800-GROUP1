@@ -2,6 +2,8 @@
 
 Finds the three servo pulse widths (right arm, left arm, scoop) at a known pose. With them, the angles in `Sequence.h` and the sequence editor's twin are real degrees.
 
+> **Easier:** with `Robot_Controller_V2_1` uploaded, the sequence editor's **Calibrate servos** tab does the same procedure with buttons over the live link (Connect & move → Hold still → Connect robot). Use this sketch when the editor isn't an option.
+
 **Why it's needed:** hobby servos have no position feedback. The code turns an angle into a pulse width with:
 
 ```
@@ -63,11 +65,11 @@ Pulse direction, as configured in `RobotConfig.h`: **`r+` raises the arm** (righ
 
 ## Using the numbers
 
-**Best: the sequence editor.** `tools/sequence_editor.html` → Open robot folder → **Calibration** tab:
+**Best: the sequence editor.** `tools/sequence_editor.html` → Open robot folder → **Calibrate servos** tab → **Use the new numbers**:
 
 1. Type the three numbers.
-2. Choose **Keep the robot's motion** (pulse widths stay the same; the angles in `Sequence.h` are re-worked so the twin matches the robot). Use this when the robot already moves correctly. The other choice, **Keep the angles**, moves the robot to match the angles in `Sequence.h`.
-3. **Apply calibration** → **Save** → upload `Robot_Controller_V2_1`.
+2. Under **What should stay the same?** choose **How the robot moves** (pulse widths stay the same; the angles in `Sequence.h` are re-worked so the twin matches the robot). Use this when the robot already moves correctly. The other choice, **The angle numbers**, moves the robot to match the angles in `Sequence.h`. The box underneath lists exactly what will change.
+3. **Apply to the editor** (changes numbers only: it doesn't move the robot) → **Save** → upload `Robot_Controller_V2_1`.
 
 **By hand:** paste the three lines into `Robot_Controller_V2_1/RobotConfig.h` and ask your agent to re-work the angles in `Sequence.h` so the pulse widths stay the same (AGENTS.md, "Servo calibration results arrive"). Pasting alone, without re-working the angles, changes how the robot moves.
 
@@ -83,7 +85,7 @@ Checks the servos really are 300° (**8.0 µs per arm degree** through the 40T:4
 
 2. Put a phone level on an arm post and use `a+` / `a-` until it reads 90°. Put it on the blade and use `s+` / `s-` until it's level.
 3. **`p`.** In level mode the first line is the level pulses (`# LEVEL pose … R … S …`). The paste lines below it are still the reference values.
-4. Editor → Calibration → **Scale check**: enter the level R and S pulses → **Work out scale**. More than about 3% off 8.0 / 6.667 means the servo scale in `RobotConfig.h` needs changing: tell your agent.
+4. Editor → Calibrate servos → **Scale check**: enter the level R and S pulses → **Work out scale**. More than about 3% off 8.0 / 6.667 means the servo scale in `RobotConfig.h` needs changing: tell your agent.
 5. `cal` goes back to the reference pose; nudges made in level mode are discarded.
 
 ## Troubleshooting

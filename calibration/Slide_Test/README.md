@@ -2,7 +2,7 @@
 
 Moves the outtake slides to a position you type, in **mm**, with a smooth motion profile: it speeds up, cruises, then slows down. It can also log every move as a graph. Nothing moves until you type a command.
 
-- Positions are in mm from wherever you last typed `z`. 1 encoder count = 0.5317 mm (36.15 mm spool, 1.8:1 step-up).
+- Positions are in mm from wherever you last typed `z`. 1 encoder count = 0.2954 mm (36.15 mm spool, 1:1 gearing since 16 Oct; it was 0.5317 with the old 1.8:1 step-up).
 - Pins: motor MA = D8, MB = D9, PWM = D11; encoder D2 / D3.
 - **Battery must be ON.** With USB only, the encoder count drifts and moves abort.
 
@@ -15,7 +15,7 @@ Moves the outtake slides to a position you type, in **mm**, with a smooth motion
 | `z` | Zero: "this spot is 0 mm". Do it fully retracted. | `z` |
 | `m <mm>` | Move smoothly **to** a position | `m 100` → goes to 100 mm |
 | `m <mm> <vel>` | Same, at a one-off top speed (mm/s) | `m 500 800` |
-| `m <mm> <vel> <acc>` | Same, with a one-off speed and acceleration | `m 500 800 3000` |
+| `m <mm> <vel> <acc>` | Same, with a one-off speed and acceleration | `m 500 400 1500` |
 | `mr <mm>` | Move smoothly **by** a distance from where it is now (also takes `<vel> <acc>`) | `mr 100` → 100 mm further out, `mr -50` → 50 mm back |
 | `r` | Go back to 0 mm | `r` |
 | `e` | Go to the `ext` position | `e` |
@@ -30,7 +30,7 @@ Moves the outtake slides to a position you type, in **mm**, with a smooth motion
 
 | Type | Does | Example |
 |---|---|---|
-| `vel <mm/s>` | Top speed for all moves | `vel 600` |
+| `vel <mm/s>` | Top speed for all moves | `vel 400` |
 | `acc <mm/s²>` | How hard it speeds up and slows down | `acc 2000` |
 | `ext <mm>` | Position used by `e` and `t` | `ext 450` |
 | `s` | Show position, target, ext, vel and acc | `s` |
@@ -38,11 +38,11 @@ Moves the outtake slides to a position you type, in **mm**, with a smooth motion
 These live changes are **lost on restart**. To change the start-up values, edit near the top of `Slide_Test.ino`:
 
 ```cpp
-const float DEFAULT_VEL_MM_S  = 300.0f;    // mm/s
-const float DEFAULT_ACC_MM_S2 = 1000.0f;   // mm/s^2
+const float DEFAULT_VEL_MM_S  = 167.0f;    // mm/s
+const float DEFAULT_ACC_MM_S2 = 556.0f;    // mm/s^2
 ```
 
-Rough guide: the motor's top speed is about 1480 mm/s with no load. Above about 1100 mm/s the motor runs out of power and the slide lags behind the profile (the summary line shows a large `peak lag`). Raise `vel` in steps (400, 600, 800…) and watch `peak lag` and `final err`.
+Rough guide: with 1:1 gearing the motor's top speed is about 824 mm/s with no load at 12 V (about 1150 mm/s on a full 4S battery). Above about 650 mm/s (at 12 V) the motor runs out of power and the slide lags behind the profile (the summary line shows a large `peak lag`). Raise `vel` in steps and watch `peak lag` and `final err`.
 
 ### Output and tuning
 
@@ -111,7 +111,7 @@ One-time setup: Python and pyserial, step by step in [`Robot_Controller_V2_1/LOG
    python tools/capture_log.py --port COM5 --keep-open --label slidetest
    ```
    The Nano restarts, which is normal. Leave the output on raw data (don't type `d`).
-5. Type commands + Enter (`z`, `m 100`, `r`…). The `# move` summaries are in mm. The live `slide=` numbers are raw counts (divide by 1.88 to get mm).
+5. Type commands + Enter (`z`, `m 100`, `r`…). The `# move` summaries are in mm. The live `slide=` numbers are raw counts (multiply by 0.2954 to get mm).
 6. **Ctrl+C** when done. Open the new `.html` file in `logs/` to see the graphs.
 
 To change code: Ctrl+C, upload, then **Up arrow + Enter** in the black window.

@@ -18,7 +18,8 @@ static double simUs = 0.0;
 static std::mt19937 rng(42);
 static void advanceUs(double us);
 
-unsigned long millis() { return (unsigned long)(simUs / 1000.0); }
+static bool inSetup = false;   // busy-wait loops in setup() (bench handshake) need time to pass
+unsigned long millis() { if (inSetup) advanceUs(100.0); return (unsigned long)(simUs / 1000.0); }
 unsigned long micros() { return (unsigned long)simUs; }
 void delay(unsigned long ms) { advanceUs(ms * 1000.0); }
 
@@ -142,7 +143,7 @@ int main(int argc, char** argv) {
   if (getenv("SIM_FRICTION")) simFriction = atof(getenv("SIM_FRICTION"));
   if (getenv("SIM_XMAX")) plant.xMax = atof(getenv("SIM_XMAX"));
   if (getenv("SIM_CONTACT")) plant.contact = atof(getenv("SIM_CONTACT"));
-  setup();
+  inSetup = true; setup(); inSetup = false;
   while (simUs < seconds * 1e6) {
     while (si < script.size() && millis() >= script[si].first) {
       for (char c : script[si].second) rxQueue.push_back(c);

@@ -32,9 +32,9 @@ const int PULSE_PWM = 100;   // 0-255, keep low for testing
 const int PULSE_MS  = 200;
 
 // mm of slide travel per encoder count. Set this with the "c" command.
-// pi * 36.15 mm spool / (384.5 / 1.8 counts per spool rev) = 0.5317 mm/count.
+// pi * 36.15 mm spool / 384.5 counts per spool rev (1:1 gearing since 16 Oct) = 0.2954 mm/count.
 // Wrong if the slide is cascade-rigged; use "c" to check with a ruler.
-float MM_PER_COUNT = 0.5317;   // 36.15 mm spool (measured). Extending reads NEGATIVE here (raw count).
+float MM_PER_COUNT = 0.2954;   // 36.15 mm spool (measured), 1:1. Extending reads NEGATIVE here (raw count).
 
 void motor(int pwm) {
   digitalWrite(MOTOR_A, pwm > 0);

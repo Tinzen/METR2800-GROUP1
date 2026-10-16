@@ -26,6 +26,7 @@ void MotionProfile::moveToVel(float startPosition, float targetPosition, float s
   targetPos = targetPosition;
   currentPos = startPosition;
   startTimeMs = millis();
+  revT = 0.0f;
   currentVel = 0.0f;
   currentAcc = 0.0f;
   progress = 0.0f;
@@ -46,6 +47,22 @@ void MotionProfile::moveToVel(float startPosition, float targetPosition, float s
     return;
   }
   plan();
+  done = false;
+}
+
+void MotionProfile::moveFrom(float startPosition, float targetPosition, float curVel) {
+  if (curVel * (targetPosition - startPosition) >= 0.0f) {      // same way (or at rest)
+    moveToVel(startPosition, targetPosition, curVel, 0.0f);
+    return;
+  }
+  // heading away from the new target: brake to a stop at maxAcc, then a normal move from there
+  const float tb = fabs(curVel) / maxAcc;
+  moveToVel(startPosition + 0.5f * curVel * tb, targetPosition, 0.0f, 0.0f);
+  revT = tb;
+  revV = curVel;
+  revP = startPosition;
+  currentPos = startPosition;
+  progress = 0.0f;
   done = false;
 }
 
@@ -132,7 +149,16 @@ float MotionProfile::update() {
   }
 
   const unsigned long now = millis();
-  const float elapsed = (now - startTimeMs) / 1000.0f;
+  float elapsed = (now - startTimeMs) / 1000.0f;
+  if (elapsed < revT) {                     // moveFrom: still braking from the old move
+    const float a = (revV > 0.0f) ? -maxAcc : maxAcc;
+    currentVel = revV + a * elapsed;
+    currentAcc = a;
+    currentPos = revP + revV * elapsed + 0.5f * a * elapsed * elapsed;
+    progress = 0.0f;
+    return currentPos;
+  }
+  elapsed -= revT;
   float dist, vel, acc;
   sample(elapsed, dist, vel, acc);
   if (dist < 0.0f) dist = 0.0f;
@@ -156,7 +182,7 @@ float MotionProfile::update() {
 bool MotionProfile::isFinished() const { return done; }
 float MotionProfile::getVelocity() const { return currentVel; }
 float MotionProfile::getAcceleration() const { return currentAcc; }
-float MotionProfile::getTotalTime() const { return totalTime; }
+float MotionProfile::getTotalTime() const { return revT + totalTime; }
 float MotionProfile::getProgress() const { return progress; }
 float MotionProfile::getMaxVelocity() const { return maxVel; }
 float MotionProfile::getMaxAcceleration() const { return maxAcc; }

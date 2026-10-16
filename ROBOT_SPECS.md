@@ -15,7 +15,7 @@ Status tags:
 
 | Item | Value | Status | Code (files) |
 |---|---|---|---|
-| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1 uses 28.0 KB / 1.16 KB. | confirmed | n/a |
+| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1 uses 28.9 KB / 1.16 KB. | confirmed | n/a |
 | Outtake driver | Heatsinked **IN1/IN2 + PWM** board (part number not recorded) | confirmed 14 Oct | n/a |
 | Motor dir A | **D8** | confirmed 14 Oct | `OUTTAKE_MA` (V2_1 `RobotConfig.h`, calibration/Slide_Test, Slide_PID_Tune); `MOTOR_A` (calibration/Slide_Encoder_Check) |
 | Motor dir B | **D9** | confirmed 14 Oct | `OUTTAKE_MB`, `MOTOR_B` |
@@ -43,21 +43,21 @@ The motor drive logic is: MA high + MB low = one direction; MA low + MB high = t
 | Item | Value | Status | Code |
 |---|---|---|---|
 | Motor | goBILDA 5203 Yellow Jacket, 435 rpm, 13.7:1 | confirmed | n/a |
-| Encoder resolution | **384.5 counts per gearbox output rev** (x4 quadrature, `Encoder` library). The encoder sits before the step-up. | confirmed | n/a |
-| Step-up to spool | **1.8:1** (the spool turns faster than the motor). Changing it: see AGENTS.md "Workflows". | confirmed | `SLIDE_STEP_UP` (V2_1 `RobotConfig.h`) |
-| Counts per spool rev | 384.5 / 1.8 = **213.6** | calc | n/a |
+| Encoder resolution | **384.5 counts per gearbox output rev** (x4 quadrature, `Encoder` library). The encoder is on the motor; the gearing to the spool is now 1:1. | confirmed | n/a |
+| Gearing to spool | **1:1** (16 Oct; the 1.8:1 step-up was swapped out). Changing it: see AGENTS.md "Workflows". | confirmed 16 Oct | `SLIDE_STEP_UP` = 1.0 (V2_1 `RobotConfig.h`) |
+| Counts per spool rev | **384.5** | calc | n/a |
 | Spool diameter | **36.15 mm** (113.57 mm per rev) | confirmed | `SLIDE_SPOOL_DIA_MM` |
 | Stringing | **1:1** (1 mm of string = 1 mm of slide travel) | confirmed | n/a |
-| **mm per count** | π × 36.15 / 213.6 = **0.5317** (1.881 counts per mm) | calc | `SLIDE_MM_PER_COUNT` (V2_1, computed); `MM_PER_TICK` (calibration/Slide_Test, Slide_PID_Tune); `MM_PER_COUNT` (calibration/Slide_Encoder_Check) |
+| **mm per count** | π × 36.15 / 384.5 = **0.2954** (3.386 counts per mm). Was 0.5317 with the 1.8:1 step-up. | calc | `SLIDE_MM_PER_COUNT` (V2_1, computed); `MM_PER_TICK` (calibration/Slide_Test, Slide_PID_Tune); `MM_PER_COUNT` (calibration/Slide_Encoder_Check) |
 | Encoder direction | **−1**. The raw count goes negative on extend. | confirmed 14 Oct | `SLIDE_ENCODER_DIR` (V2_1); `OUTTAKE_ENCODER_DIRECTION` (Slide_Test, Slide_PID_Tune). Slide_Encoder_Check shows the raw count on purpose. |
 | Motor direction | +1 (positive PWM should extend). Check that `j 100 300` extends. | **TODO** | `SLIDE_MOTOR_DIR` (V2_1); `OUTTAKE_MOTOR_DIRECTION` (calibration) |
-| Free speed | 2790 counts/s ≈ **1480 mm/s** at 12 V | calc | n/a |
-| Usable speed | About 1100–1200 mm/s under load. Keep profile max velocity at or below ~2200 counts/s (~1170 mm/s). | calc | `SLIDE_FAST`, `SLIDE_MAX` (V2_1 `Sequence.h`, mm/s) |
-| Stall pull | 1.83 N·m motor → 1.02 N·m at the spool → **about 56 N** of string pull | calc | n/a |
+| Free speed | 2790 counts/s ≈ **824 mm/s** at 12 V; about 1150 mm/s on a full 4S (16.8 V) | calc | n/a |
+| Usable speed | About 80% of free speed: ~650 mm/s at 12 V (~2200 counts/s). The 15 Oct runs peaked at ~3360 counts/s ≈ 990 mm/s, so the battery was well above 12 V. `SLIDE_RETRACT_SPEED` (1111 mm/s, was `SLIDE_MAX`) asks for more than that: PWM saturates on RETRACT. | calc | `SLIDE_FAST`, `SLIDE_RETRACT_SPEED` (V2_1 `Sequence.h`, mm/s) |
+| Stall pull | 1.83 N·m motor = 1.83 N·m at the spool (1:1) → **about 101 N** of string pull | calc | n/a |
 | Moving mass | Not measured (needed for the accel limit and kA) | TODO | n/a |
 | Slides | 9 stages × 400 mm, stacked 10 mm apart | CAD | n/a |
-| Max safe travel | Unknown. Slide_Test has no limit (Tinzen's choice). The stall cut-out is the only end protection. | TODO | V2_1 has no soft limit either; the stall fallback retracts. |
-| Creep start / bucket fully tipped | `X_CREEP` 450 mm, `X_TIP` 530 mm are **safe placeholders**. The twin estimates the hopper rim at about 1740 mm (depends on the real slide angle). Measure with calibration/Slide_Test (README step 2). | **TODO** | `X_CREEP`, `X_TIP` (V2_1 `Sequence.h`) |
+| Max safe travel | **End stop at ~1694 mm** (~5735 counts): every 15 Oct full run stalled there during CREEP. Slide_Test has no limit (Tinzen's choice). The stall cut-out is the only end protection. | measured 15 Oct (logs) | V2_1 has no soft limit either; the stall fallback retracts. |
+| Creep start / bucket fully tipped | `X_CREEP` **1666.7 mm**, `X_TIP` **1788.9 mm**: the 15 Oct tuning values (3000 / 3220) re-scaled to the true mm/count, so the motion in counts is unchanged. `X_TIP` is **past the ~1694 mm end stop**, so CREEP ends in a STALL and the FALLBACK skips TIP_HOLD. CAD estimate ~1650 / 1740. | **TODO: set X_TIP below the stop** | `X_CREEP`, `X_TIP` (V2_1 `Sequence.h`) |
 
 V2_1's sequence uses **mm from fully retracted** (zeroed at power-up: slides must be fully in). The controller runs in encoder counts internally. Slide_Test and Slide_PID_Tune take mm on serial.
 
@@ -72,9 +72,9 @@ Gains are tuning values, not specs: `SLIDE_K*` in V2_1 `RobotConfig.h`, in motor
 | Arm scale | **8.0 µs per arm degree**; right servo pulse falls as the arm goes out, left rises | calc | `ARM_US_PER_DEG`, `ARM_R_DIR` −1, `ARM_L_DIR` +1 |
 | Scoop scale | Direct drive, **6.667 µs per degree** | calc | `SCOOP_US_PER_DEG`, `SCOOP_DIR` +1 |
 | Reference pose | **Scoop laid flat on the intake floor** (hard stop). CAD: arm **110.6°**, scoop **−69.4°**. | CAD | `CAL_ARM_DEG`, `CAL_SCOOP_DEG` |
-| Pulses at the reference pose | R **940**, L **2060**, scoop **1900** µs: the V2 SCOOP pose, which lies flat on the floor (Tinzen, 15 Oct). Refine with `Servo_Offset_Cal`. | stated; **refine with cal** | `ARM_R_CAL_US`, `ARM_L_CAL_US`, `SCOOP_CAL_US` |
+| Pulses at the reference pose | R **910**, L **2105**, scoop **1968** µs, measured 16 Oct with the editor's Calibrate servos tab (was 940 / 2060 / 1900 from the V2 pose). Angles in `Sequence.h` re-worked so the robot moves the same. | confirmed 16 Oct | `ARM_R_CAL_US`, `ARM_L_CAL_US`, `SCOOP_CAL_US` |
 | Soft limits | Arm −55…125°, scoop −260…20°, any pulse 500–2500 µs | n/a | `ARM_MIN_DEG` … `PULSE_ABS_MAX` |
-| Unloaded speed | ~430 °/s at the servo (estimate, for `INSTANT` moves) | estimate | `SERVO_NATIVE_DEG_S` |
+| Unloaded speed | ~430 °/s at the servo (estimate): the fastest a servo profile can usefully go (arm 358 °/s through the gears) | estimate | `SERVO_NATIVE_DEG_S`, `ARM_FAST` / `SCOOP_FAST` |
 
 Pulse = reference pulse + direction × scale × (angle − reference angle). Angles: **arm** = degrees forward of vertical (+ = out toward the intake floor); **scoop** = degrees relative to the arm, 0 = CAD pose (blade flat on top, arm vertical). The twin rotates the scoop by +angle about the CAD X axis (direction +1, checked: scoop holds rocks at SCOOP/PICKUP and pours at TRANSFER).
 
@@ -114,7 +114,7 @@ Named poses are sequence values and live in `Sequence.h` (degrees). The tested V
 2. Motor direction (does `j 100 300` extend?).
 3. `X_CREEP` / `X_TIP`: jog until the bucket touches the pole / has tipped.
 4. Slide gains: `calibration/Slide_PID_Tune`, then `SLIDE_K*`.
-5. `S_CARRY`, `S_POUR`, `PICKUP` time: tune in the sequence editor (Live link).
+5. `S_CARRY`, `S_POUR`, `PICKUP` time: tune in the sequence editor (Step & move tab, or drag the ◆ on the timeline with Robot follows timeline on).
 6. Real slide angle, and max safe travel.
 7. Real robot height against the 400 mm cube.
 8. Motor driver part number; Nano VIN vs 5V feed.

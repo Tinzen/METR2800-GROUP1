@@ -21,12 +21,15 @@ class MotionProfile {
     void moveTo(float startPosition, float targetPosition);
     // startVel / endVel are speeds (>= 0) in the direction of travel.
     void moveToVel(float startPosition, float targetPosition, float startVel, float endVel);
+    // Take over from a move in progress: curVel is its signed velocity now. Same way as the
+    // new target = carry the speed in; the other way = brake to a stop first (at maxAcc), then go.
+    void moveFrom(float startPosition, float targetPosition, float curVel);
     float update();
     bool isFinished() const;
 
     float getVelocity() const;      // signed units/s at last update()
     float getAcceleration() const;  // signed units/s^2 at last update()
-    float getTotalTime() const;     // seconds for the current move
+    float getTotalTime() const;     // seconds for the current move (incl. any braking)
     float getProgress() const;      // 0..1 of distance at last update()
     float getMaxVelocity() const;
     float getMaxAcceleration() const;
@@ -40,6 +43,9 @@ class MotionProfile {
     float currentPos;
     float direction;
     unsigned long startTimeMs;
+    float revT;        // moveFrom: braking time before the move (s), 0 = none
+    float revV;        //           signed velocity braking starts from
+    float revP;        //           position braking starts from
 
     float totalDist;
     float v0;          // entry speed

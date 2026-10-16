@@ -22,14 +22,14 @@ const int SCOOP_OUTPUT = 3;
 
 // ---- SLIDE DRIVETRAIN  (gear-ratio change = edit SLIDE_STEP_UP only) -----------
 const float SLIDE_COUNTS_PER_MOTOR_REV = 384.5f;   // goBILDA 5203 435 rpm, encoder before the step-up
-const float SLIDE_STEP_UP = 1.8f;                  // spool turns this many times per motor turn
+const float SLIDE_STEP_UP = 1.0f;                  // spool turns this many times per motor turn (1:1 since 16 Oct; was 1.8)
 const float SLIDE_SPOOL_DIA_MM = 36.15f;           // measured
 const float SLIDE_STRINGING = 1.0f;                // mm of slide per mm of string (1:1)
 const float SLIDE_MOTOR_FREE_RPM = 435.0f;         // at 12 V
 const float SLIDE_MM_PER_COUNT =
-    3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING / (SLIDE_COUNTS_PER_MOTOR_REV / SLIDE_STEP_UP);   // 0.5317
+    3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING / (SLIDE_COUNTS_PER_MOTOR_REV / SLIDE_STEP_UP);   // 0.2954
 const float SLIDE_FREE_SPEED_MM_S =
-    SLIDE_MOTOR_FREE_RPM / 60.0f * SLIDE_STEP_UP * 3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING; // ~1480
+    SLIDE_MOTOR_FREE_RPM / 60.0f * SLIDE_STEP_UP * 3.14159265f * SLIDE_SPOOL_DIA_MM * SLIDE_STRINGING; // ~824 at 12 V
 
 const int SLIDE_ENCODER_DIR = -1;  // raw count goes negative on extend (tested 14 Oct)
 const int SLIDE_MOTOR_DIR = 1;     // + PWM must EXTEND   (UNCONFIRMED: check with 'j 100 300')
@@ -44,21 +44,21 @@ const float SLIDE_KV = 0.09f;      // PWM per count/s
 const float SLIDE_KA = 0.0f;       // PWM per count/s^2
 const float SLIDE_KG = 0.0f;       // constant PWM against gravity on the incline (+ = extend)
 const int   SLIDE_MAX_PWM = 250;
-const float SLIDE_TOLERANCE_MM = 1.5f;        // PID deadband
-const float SLIDE_ARRIVE_TOL_MM = 12.0f;      // "close enough" to finish a step
-const float SLIDE_SETTLED_TOL_MM = 80.0f;     // stopped this close also counts (logs SETTLED_SHORT)
+const float SLIDE_TOLERANCE_MM = 0.83f;       // PID deadband   (16 Oct: /1.8 with the ratio fix, same counts as before)
+const float SLIDE_ARRIVE_TOL_MM = 6.7f;       // "close enough" to finish a step   (was 12 at the old scale)
+const float SLIDE_SETTLED_TOL_MM = 44.4f;     // stopped this close also counts (logs SETTLED_SHORT)   (was 80)
 
 // ---- SERVO CALIBRATION  (set by calibration/Servo_Offset_Cal) ------------------
 // Reference pose = scoop laid FLAT on the intake floor (a hard stop).
 // The CAD says that pose is ARM 110.6 deg, SCOOP -69.4 deg.
 const float CAL_ARM_DEG = 110.6f;
 const float CAL_SCOOP_DEG = -69.4f;
-// Pulse widths that put each servo at the reference pose. Set 15 Oct from Tinzen:
-// the V2 SCOOP pose (arm 150 = R 940 / L 2060 us, scoop 1900 us) lies flat on the
-// floor. Refine with calibration/Servo_Offset_Cal.
-const float ARM_R_CAL_US = 940.0f;
-const float ARM_L_CAL_US = 2060.0f;
-const float SCOOP_CAL_US = 1900.0f;
+// Pulse widths that put each servo at the reference pose. Measured 16 Oct with the
+// editor's Calibrate servos tab (was 940 / 2060 / 1900 from the V2 pose). Sequence.h
+// angles were re-worked with "How the robot moves", so the robot moves the same.
+const float ARM_R_CAL_US = 910.0f;
+const float ARM_L_CAL_US = 2105.0f;
+const float SCOOP_CAL_US = 1968.0f;
 // Scale: goBILDA 300 deg servos (2000 us / 300 deg). Arm goes through 40T:48T gears.
 const float ARM_US_PER_DEG = 8.0f;
 const float SCOOP_US_PER_DEG = 6.667f;
@@ -75,7 +75,7 @@ const float SCOOP_MIN_DEG = -260.0f;
 const float SCOOP_MAX_DEG = 20.0f;
 const int PULSE_ABS_MIN = 500;     // hard clamp on any pulse (us)
 const int PULSE_ABS_MAX = 2500;
-const float SERVO_NATIVE_DEG_S = 430.0f;   // unloaded servo speed (estimate) for INSTANT moves
+const float SERVO_NATIVE_DEG_S = 430.0f;   // unloaded servo top speed (estimate): ARM_FAST / SCOOP_FAST in Sequence.h; the editor caps servo speeds here
 const float ARM_GEAR_RATIO = 48.0f / 40.0f;// arm is slower than its servos by this much
 
 // ---- SAFETY -----------------------------------------------------------------------

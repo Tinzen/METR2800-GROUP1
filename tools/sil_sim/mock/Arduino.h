@@ -31,6 +31,7 @@ class SerialMock {
   void begin(unsigned long) {}
   int available();
   int read();
+  void flush() {}
   size_t write(const char* s);
   size_t print(const char* s) { return write(s); }
   size_t print(const __FlashStringHelper* s) { return write((const char*)s); }

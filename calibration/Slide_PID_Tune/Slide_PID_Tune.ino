@@ -43,22 +43,22 @@ const int OUTTAKE_ENCODER_DIRECTION = -1;
 const int OUTTAKE_MOTOR_DIRECTION = 1;
 
 // ---------------- units ----------------
-// 435 rpm motor, 384.5 counts/rev, 1.8:1 step-up, 36.15 mm spool, 1:1 string.
-const float MM_PER_TICK = 3.14159265f * 36.15f / (384.5f / 1.8f);   // 0.5317
+// 435 rpm motor, 384.5 counts/rev, 1:1 to the spool (16 Oct; was 1.8:1), 36.15 mm spool, 1:1 string.
+const float MM_PER_TICK = 3.14159265f * 36.15f / 384.5f;   // 0.2954
 float toMm(float ticks) { return ticks * MM_PER_TICK; }
 float toTicks(float mm) { return mm / MM_PER_TICK; }
 
 // ---------------- starting gains (= V2_1 / Slide_Test) ----------------
 float kP = 0.4f, kI = 0.0f, kD = 0.0f;
 float kS = 12.0f, kV = 0.09f, kA = 0.0f, kG = 0.0f;
-float maxVel = toTicks(300.0f);      // ticks/s   (vel command is in mm/s)
-float maxAcc = toTicks(1000.0f);     // ticks/s^2 (acc command is in mm/s^2)
+float maxVel = toTicks(167.0f);      // ticks/s   (vel command is in mm/s; was 300 at the old scale)
+float maxAcc = toTicks(556.0f);      // ticks/s^2 (acc command is in mm/s^2; was 1000)
 
 // ---------------- test settings ----------------
 const int   MAX_PWM = 250;           // during tests
 const int   STEP_MAX_PWM = 150;      // step test is harsher: cap it lower
 const int   HOLD_PWM = 80;           // holding between / after tests
-const float SETTLE_MM = 3.0f;        // "settled" = within this of target...
+const float SETTLE_MM = 1.7f;        // "settled" = within this of target...
 const unsigned long SETTLE_MS = 150; // ...for this long
 const unsigned long TIMEOUT_MARGIN_MS = 2000;
 const unsigned long DWELL_MS = 400;  // pause between bounce moves
@@ -269,7 +269,7 @@ void runTest() {
     const bool stuck = abs(outtake.getCommandPower()) >= STALL_PWM && fabs(outtake.getVelocity()) < STALL_VEL;
     if (stuck) { if (!stallSince) stallSince = now; } else stallSince = 0;
     if (stallSince && now - stallSince >= STALL_MS && now - mvStartMs > 300) {
-      if (fabs(pos - mvStart) < toTicks(20)) {
+      if (fabs(pos - mvStart) < toTicks(11)) {
         Serial.println(F("# NO_MOTION: battery off, motor/encoder unplugged, or direction wrong"));
         stopAll(F("NO_MOTION"));
       } else stopAll(F("STALL"));
