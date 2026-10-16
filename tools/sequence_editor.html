@@ -105,6 +105,9 @@ button.small { padding: 4px 9px; font-size: 13px; }
 .filechip b { color: var(--ink-2); font-weight: 500; }
 .total { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
 .total .big { font-family: var(--f-data); font-size: 19px; font-weight: 500; }
+.brand2 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.brand2 .filechip { max-width: 13ch; }
+.progsel { font-size: 12px; padding: 1px 4px; max-width: 160px; font-weight: 600; flex: none; color: var(--accent); }
 .total .lab { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
 .btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .robotbtns { padding-left: 10px; border-left: 1px solid var(--line); }
@@ -373,7 +376,7 @@ table.steps td.limcell input { width: 70px; }
 <body>
 <header class="top" id="top">
   <div class="top-in">
-    <div class="brand"><h1>Dover sequence</h1><span id="fileChip" class="filechip">built-in snapshot</span></div>
+    <div class="brand"><h1>Dover sequence</h1><div class="brand2"><select id="progSel" class="progsel" aria-label="Program: which version of the whole sequence" title="Program: which version of the whole sequence you're editing (Max speed, Slow 20 s…). Save puts it in Sequence.h, so it's the one the robot runs after you upload."></select><span id="fileChip" class="filechip">built-in snapshot</span></div></div>
     <div class="total" title="How long the whole sequence takes in the editor's model"><span class="lab">Predicted run</span><span id="totalTime" class="big">–</span></div>
 
     <button id="btnIssues" class="issues" aria-haspopup="dialog" aria-expanded="false" title="Problems the editor can see in the sequence: click one to go to it">Issues</button>
@@ -515,6 +518,7 @@ table.steps td.limcell input { width: 70px; }
           <p class="hint"><b>Next step</b>: after ms · all arrived ± ms (<b>every</b> axis has stopped: arm, scoop and slides, including moves started in earlier steps) · arm / scoop / slides arrived ± ms (that axis only) · arm / scoop / slides at % of its move. <b>+ ms</b> waits that long after arriving; <b>− ms</b> goes that long <i>before</i> it arrives (by the plan), so the next move starts early and blends in. Two slide steps in a row going the same way blend without stopping.</p>
           <p class="hint"><b>Or after</b> (tick it; off by default): the step moves on after this long even if its condition never comes true (a stuck slide, a stalled move). The robot logs <span class="mono">E,STEP_LIMIT</span>; the timeline marks the step ⏱.</p>
           <p class="hint"><b>Speeds</b>: servos in °/s (default ARM_SPEED / SCOOP_SPEED; ARM_FAST / SCOOP_FAST = the servo's own top speed). Slides pick a named speed; SLIDE_RETRACT_SPEED uses SLIDE_RETRACT_ACCEL / _DECEL. Every axis has an <b>ACCEL</b> (speeding up) and a <b>DECEL</b> (slowing down) in Angles &amp; values. For <b>one</b> servo move, click <b>a/d</b> next to its speed in the Step tab (or the acc / dec boxes in the table): a % of the axis's values (100 = those).</p>
+          <p class="hint"><b>Program</b> (menu under the title): Max speed / Slow 20 s / Slow 30 s are separate versions of the whole sequence (files in programs/). Save puts the selected one in Sequence.h: that's what the robot runs after upload. <b>＋ New program</b> makes a scaled copy.</p>
           <p class="hint"><b>Test flags</b>: <b>⊘ Skip</b> a step (it stays in the file and on the timeline as ⊘, but doesn't run) or <b>⏹ Stop</b> after a step (the robot then goes back to the start pose; the rest is greyed). Step tab, the table's Run menu, or right-click a step on the timeline. Saved in Sequence.h, so the uploaded robot does it too. The red <b>TEST</b> chip on the timeline means one is set.</p>
           <p class="hint"><b>Slides by hand</b> (Angles &amp; values, connected): hold <b>◀ In</b> / <b>Out ▶</b> to drive them gently, <b>Zero here</b> makes where they are 0 mm, and letting go of the SLIDES slider sends them there.</p>
           <p class="hint"><b>Drives</b>: <b>Twin only</b> moves nothing real. <b>Robot · live</b> streams the twin's pose 25 times a second (timing comes from the editor's model). <b>Robot · uploaded</b> runs the robot's own copy; <b>Pause each step</b> stops it after every step and <b>Continue</b> runs the next.</p>
@@ -533,7 +537,7 @@ table.steps td.limcell input { width: 70px; }
         </div>
         <div class="vgroup">
           <h3>Safety and the robot link</h3>
-          <p class="hint"><b>■ Stop</b> (top right, or X) stops playback, the robot's run, the slides (they go loose) and the shaking. <b>Limp</b> lets everything go so you can move it by hand. <b>↺ Reset</b> sends the robot to the IDLE pose with the slides in, and puts <b>Drives</b> back to what you last picked (■ Stop and Limp drop Robot · live to Twin only).</p>
+          <p class="hint"><b>■ Stop</b> (top right, or X) stops playback, the robot's run, the slides (they go loose) and the shaking. <b>Limp</b> lets everything go so you can move it by hand. <b>↺ Reset</b> brings the slides in with the arm and scoop at A_RESET / S_RESET (clear of the slides), then sends them to the IDLE pose, and puts <b>Drives</b> back to what you last picked (■ Stop and Limp drop Robot · live to Twin only).</p>
           <p class="hint">When you press <b>Connect robot</b> the robot holds still and waits (▾ next to it changes that). You never need to change <span class="mono">RUN_MODE</span> in the code. With no computer attached it runs as normal.</p>
           <p class="hint"><b>3D view</b>: locked by default so a stray drag doesn't spin it. Unlocked: scroll zooms at the cursor, middle-drag pans, Shift + middle-drag orbits, double-click fits.</p>
           <p class="hint">Without the folder (other browsers): edit, then <b>⋯</b> → Download or Copy, and replace <span class="mono">Sequence.h</span>. Tell your agent if you did, so the files stay in sync. Full walkthrough: <span class="mono">SEQUENCE_TUNING.md</span>. The twin's angles are only as good as the servo calibration (<b>Calibrate servos</b>).</p>
@@ -570,6 +574,7 @@ table.steps td.limcell input { width: 70px; }
 // =============================================================================
 #pragma once
 #include "SequenceTypes.h"
+#define PROGRAM_NAME "Max speed"   // the editor's Program menu: which version of the sequence this is
 
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -31.6f;  // power-on pose (V2 940)
@@ -578,6 +583,7 @@ const float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)
 const float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)
 const float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)
 const float A_MOVE     =   35.9f;  // clear of the slides (V2 500)
+const float A_RESET    =    35.9f;   // Reset / STEP_STOP: the arm waits here while the slides come in (added: = A_MOVE)
 
 // ---- SCOOP ANGLES (deg) -----------------------------------------------------
 const float S_START    =    5.4f;  // power-on pose (V2 2300 us)
@@ -586,9 +592,10 @@ const float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 
 const float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)
 const float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
 const float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
+const float S_RESET    =  -250.0f;   // Reset / STEP_STOP: the scoop waits here while the slides come in (added: = S_DOWN)
 
 // ---- SLIDE POSITIONS (mm) ---------------------------------------------------
-const float X_CREEP    =  1670.2f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)
+const float X_CREEP    =  1665.0f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)
 const float X_TIP      =  1780.0f;  // bucket fully tipped (was 3220). PAST the end stop (~1694 mm, 15 Oct logs): CREEP ends in a STALL
 const float X_NEW1     =   200.0f;
 
@@ -606,7 +613,7 @@ const float SCOOP_ACCEL = 2250.0f; // deg/s^2   every scoop move
 const float SCOOP_DECEL = 2250.0f; // deg/s^2   every scoop move, slowing down
 // Slide moves pick one of these speeds (not a number), so they stay fixed and tuned.
 // ACCEL = speeding up, DECEL = slowing down (the retract speed brings its own pair).
-const float SLIDE_FAST  =  700.0f; // mm/s      (was 1000 at the old scale)
+const float SLIDE_FAST  =  800.0f; // mm/s      (was 1000 at the old scale)
 const float SLIDE_CREEP =  130.0f; // mm/s      bucket tips slowly at this speed (was 200)
 const float SLIDE_ACCEL = 3000.0f; // mm/s^2    (was 5000)
 const float SLIDE_DECEL = 3000.0f; // mm/s^2    slowing down
@@ -633,18 +640,18 @@ const int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1
 const Step SEQUENCE[] PROGMEM = {
 //  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG
   { "IDLE",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },
-  { "SCOOP_DOWN",  HOLD,        0,         S_DOWN,    430,        HOLD,     0,                   0,           WAIT_MS(300),          0,       100,   100,   100,   100,   STEP_RUN  },  // V2: scoop first
-  { "ARM_DOWN",    A_DOWN,      358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2
+  { "SCOOP_DOWN",  HOLD,        0,         S_DOWN,    430,        HOLD,     0,                   0,           WAIT_MS(300),          0,       100,   100,   251,   100,   STEP_RUN  },  // V2: scoop first
+  { "ARM_DOWN",    A_DOWN,      358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       251,   70,    100,   100,   STEP_RUN  },  // V2
   { "SWEEP_UP",    A_PEAK,      185.6,     S_SCOOP,   160.3,      HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s
   { "SWEEP_DOWN",  A_SCOOP,     84.6,      HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // second half: arm drops, the scoop's move carries on
   { "WAIT",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(0),            0,       100,   100,   100,   100,   STEP_RUN  },
-  { "PICKUP",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_MS(260),          0,       100,   100,   100,   100,   STEP_RUN  },  // V2 (V1 used 100 ms)
-  { "LIFT",        A_TRANSFER,  358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(100),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup
+  { "PICKUP",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_SCOOP(75),        0,       100,   100,   85,    200,   STEP_RUN  },  // V2 (V1 used 100 ms)
+  { "LIFT",        A_TRANSFER,  358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM(10),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup
   { "CARRY",       HOLD,        0,         S_CARRY,   95.2,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V1: carry angle until nearly up
   { "POUR",        HOLD,        0,         S_POUR,    430,        HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // V1: tip into the bucket
-  { "VIBRATE",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(700),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out
+  { "VIBRATE",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(750),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out
   { "EXTEND",      A_MOVE,      0,         S_DOWN,    429.1,      X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // arm clears while slides go
-  { "CREEP",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop
+  { "CREEP",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       4000,    100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop
   { "TIP_HOLD",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(1500),         0,       100,   100,   100,   100,   STEP_RUN  },  // let the rocks fall
   { "RETRACT",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // back in, fast
 };
@@ -743,6 +750,7 @@ const unsigned long DIRCHECK_TIME_MS = 150;
 const unsigned long SLIDE_TIMEOUT_MARGIN_MS = 1500;   // step fails after profile time + this
 const unsigned long RUN_WATCHDOG_MS = 60000;          // force DONE well before 120 s
 </script>
+<script type="text/plain" id="snap-progs">[{"file": "max_speed.h", "text": "// =============================================================================\n//  DOVER SEQUENCE  -  the robot's state machine. One row = one step.\n//\n//  Edit here, or open this file in tools/sequence_editor.html (it shows the\n//  3D twin and the timing, and saves straight back to this file).\n//  Whichever was edited last wins: see AGENTS.md \"Sequence sync\".\n//\n//  ANGLES   ARM:   degrees forward of vertical (+ = out toward the intake floor)\n//           SCOOP: degrees relative to the arm (0 = CAD pose: blade flat on top, arm vertical)\n//  SLIDES   mm from fully retracted.   SPEEDS deg/s, mm/s.   TIMES ms.\n// =============================================================================\n#pragma once\n#include \"SequenceTypes.h\"\n#define PROGRAM_NAME \"Max speed\"   // the editor's Program menu: which version of the sequence this is\n\n// ---- ARM ANGLES (deg) -------------------------------------------------------\nconst float A_START    =  -31.6f;  // power-on pose (V2 940)\nconst float A_DOWN     =  100.3f;  // V2 200\nconst float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)\nconst float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)\nconst float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)\nconst float A_MOVE     =   35.9f;  // clear of the slides (V2 500)\nconst float A_RESET    =    35.9f;   // Reset / STEP_STOP: the arm waits here while the slides come in (added: = A_MOVE)\n\n// ---- SCOOP ANGLES (deg) -----------------------------------------------------\nconst float S_START    =    5.4f;  // power-on pose (V2 2300 us)\nconst float S_DOWN     = -250.0f;  // V2 700 us\nconst float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 1900 us)\nconst float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)\nconst float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)\nconst float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)\nconst float S_RESET    =  -250.0f;   // Reset / STEP_STOP: the scoop waits here while the slides come in (added: = S_DOWN)\n\n// ---- SLIDE POSITIONS (mm) ---------------------------------------------------\nconst float X_CREEP    =  1665.0f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)\nconst float X_TIP      =  1780.0f;  // bucket fully tipped (was 3220). PAST the end stop (~1694 mm, 15 Oct logs): CREEP ends in a STALL\nconst float X_NEW1     =   200.0f;\n\n// ---- SPEEDS -----------------------------------------------------------------\n// Servo moves: a step's speed (0 = the default below), speeding up at ACCEL and slowing down\n// at DECEL. Above about the servo's own top speed (FAST) the servo can't keep up and\n// \"arrived\" comes early.\nconst float ARM_SPEED   =  300.0f; // deg/s     default arm speed\nconst float ARM_FAST    =  358.3f; // deg/s     arm servos' own top speed (430 / 1.2 gearing): the old INSTANT\nconst float ARM_ACCEL   = 1600.0f; // deg/s^2   every arm move\nconst float ARM_DECEL   = 1600.0f; // deg/s^2   every arm move, slowing down\nconst float SCOOP_SPEED =  450.0f; // deg/s     default scoop speed\nconst float SCOOP_FAST  =  430.0f; // deg/s     scoop servo's own top speed: the old INSTANT\nconst float SCOOP_ACCEL = 2250.0f; // deg/s^2   every scoop move\nconst float SCOOP_DECEL = 2250.0f; // deg/s^2   every scoop move, slowing down\n// Slide moves pick one of these speeds (not a number), so they stay fixed and tuned.\n// ACCEL = speeding up, DECEL = slowing down (the retract speed brings its own pair).\nconst float SLIDE_FAST  =  800.0f; // mm/s      (was 1000 at the old scale)\nconst float SLIDE_CREEP =  130.0f; // mm/s      bucket tips slowly at this speed (was 200)\nconst float SLIDE_ACCEL = 3000.0f; // mm/s^2    (was 5000)\nconst float SLIDE_DECEL = 3000.0f; // mm/s^2    slowing down\nconst float SLIDE_RETRACT_SPEED = 2000.0f; // mm/s    RETRACT (was SLIDE_MAX). Free speed ~824 at 12 V, ~1150 on a full 4S: PWM saturates\nconst float SLIDE_RETRACT_ACCEL = 4000.0f; // mm/s^2  used with SLIDE_RETRACT_SPEED: raise it to save time\nconst float SLIDE_RETRACT_DECEL = 4000.0f; // mm/s^2  used with SLIDE_RETRACT_SPEED, slowing down\n\n// ---- VIBRATION --------------------------------------------------------------\nconst float VIBRATE_DEG = 7.5f;            // +/- deg (V1 ~ +/-50 us)\nconst int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1\n\n// ---- SEQUENCE ---------------------------------------------------------------\n// ARM / SCOOP: angle name, a number, or HOLD, then its speed in deg/s (0 = ARM_SPEED / SCOOP_SPEED).\n// SLIDE: mm, a name, or HOLD, then a named slide speed. VIBRATE: +/- deg (0 = off).\n// NEXT WHEN: WAIT_MS(ms) | WAIT_ARRIVED(ms) (every axis stopped) | WAIT_ARM_ARRIVED(ms) | WAIT_SCOOP_ARRIVED(ms)\n//            | WAIT_SLIDE_ARRIVED(ms) | WAIT_ARM(%) | WAIT_SCOOP(%) | WAIT_SLIDE(%)\n//            \"arrived\" + ms waits after arriving; a negative ms goes that long before arriving.\n// OR AFTER: ms after which the step ends anyway (something stuck). 0 = no limit.\n// A.ACC% A.DEC% / S.ACC% S.DEC%: this row's arm / scoop move speeds up / slows down at that % of\n//            ARM_ / SCOOP_ ACCEL and DECEL (100 = those; 1-255). Only that one move.\n// FLAG (testing): STEP_RUN normal | STEP_SKIP this row doesn't run | STEP_STOP the run ends after this row\n//            and the robot goes back to the start pose. Leave every row on STEP_RUN for the competition.\n// HOLD = that axis keeps doing what it was doing: a move still running when its step ends keeps going.\nconst Step SEQUENCE[] PROGMEM = {\n//  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG\n  { \"IDLE\",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"SCOOP_DOWN\",  HOLD,        0,         S_DOWN,    430,        HOLD,     0,                   0,           WAIT_MS(300),          0,       100,   100,   251,   100,   STEP_RUN  },  // V2: scoop first\n  { \"ARM_DOWN\",    A_DOWN,      358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       251,   70,    100,   100,   STEP_RUN  },  // V2\n  { \"SWEEP_UP\",    A_PEAK,      185.6,     S_SCOOP,   160.3,      HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s\n  { \"SWEEP_DOWN\",  A_SCOOP,     84.6,      HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // second half: arm drops, the scoop's move carries on\n  { \"WAIT\",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(0),            0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"PICKUP\",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_SCOOP(75),        0,       100,   100,   85,    200,   STEP_RUN  },  // V2 (V1 used 100 ms)\n  { \"LIFT\",        A_TRANSFER,  358.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM(10),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup\n  { \"CARRY\",       HOLD,        0,         S_CARRY,   95.2,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V1: carry angle until nearly up\n  { \"POUR\",        HOLD,        0,         S_POUR,    430,        HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // V1: tip into the bucket\n  { \"VIBRATE\",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(750),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out\n  { \"EXTEND\",      A_MOVE,      0,         S_DOWN,    429.1,      X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // arm clears while slides go\n  { \"CREEP\",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       4000,    100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop\n  { \"TIP_HOLD\",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(1500),         0,       100,   100,   100,   100,   STEP_RUN  },  // let the rocks fall\n  { \"RETRACT\",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // back in, fast\n};\n"}, {"file": "slow_20_s.h", "text": "// =============================================================================\n//  DOVER SEQUENCE  -  the robot's state machine. One row = one step.\n//\n//  Edit here, or open this file in tools/sequence_editor.html (it shows the\n//  3D twin and the timing, and saves straight back to this file).\n//  Whichever was edited last wins: see AGENTS.md \"Sequence sync\".\n//\n//  ANGLES   ARM:   degrees forward of vertical (+ = out toward the intake floor)\n//           SCOOP: degrees relative to the arm (0 = CAD pose: blade flat on top, arm vertical)\n//  SLIDES   mm from fully retracted.   SPEEDS deg/s, mm/s.   TIMES ms.\n// =============================================================================\n#pragma once\n#include \"SequenceTypes.h\"\n#define PROGRAM_NAME \"Slow 20 s\"   // the editor's Program menu: which version of the sequence this is\n\n// ---- ARM ANGLES (deg) -------------------------------------------------------\nconst float A_START    =  -31.6f;  // power-on pose (V2 940)\nconst float A_DOWN     =  100.3f;  // V2 200\nconst float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)\nconst float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)\nconst float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)\nconst float A_MOVE     =   35.9f;  // clear of the slides (V2 500)\nconst float A_RESET    =    35.9f;   // Reset / STEP_STOP: the arm waits here while the slides come in (added: = A_MOVE)\n\n// ---- SCOOP ANGLES (deg) -----------------------------------------------------\nconst float S_START    =    5.4f;  // power-on pose (V2 2300 us)\nconst float S_DOWN     = -250.0f;  // V2 700 us\nconst float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 1900 us)\nconst float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)\nconst float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)\nconst float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)\nconst float S_RESET    =  -250.0f;   // Reset / STEP_STOP: the scoop waits here while the slides come in (added: = S_DOWN)\n\n// ---- SLIDE POSITIONS (mm) ---------------------------------------------------\nconst float X_CREEP    =  1665.0f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)\nconst float X_TIP      =  1780.0f;  // bucket fully tipped (was 3220). PAST the end stop (~1694 mm, 15 Oct logs): CREEP ends in a STALL\nconst float X_NEW1     =   200.0f;\n\n// ---- SPEEDS -----------------------------------------------------------------\n// Servo moves: a step's speed (0 = the default below), speeding up at ACCEL and slowing down\n// at DECEL. Above about the servo's own top speed (FAST) the servo can't keep up and\n// \"arrived\" comes early.\nconst float ARM_SPEED   =  144.3f; // deg/s     default arm speed\nconst float ARM_FAST    =  172.3f; // deg/s     arm servos' own top speed (430 / 1.2 gearing): the old INSTANT\nconst float ARM_ACCEL   =  370.2f; // deg/s^2   every arm move\nconst float ARM_DECEL   =  370.2f; // deg/s^2   every arm move, slowing down\nconst float SCOOP_SPEED =  216.5f; // deg/s     default scoop speed\nconst float SCOOP_FAST  =  206.8f; // deg/s     scoop servo's own top speed: the old INSTANT\nconst float SCOOP_ACCEL =  520.6f; // deg/s^2   every scoop move\nconst float SCOOP_DECEL =  520.6f; // deg/s^2   every scoop move, slowing down\n// Slide moves pick one of these speeds (not a number), so they stay fixed and tuned.\n// ACCEL = speeding up, DECEL = slowing down (the retract speed brings its own pair).\nconst float SLIDE_FAST  =  384.8f; // mm/s      (was 1000 at the old scale)\nconst float SLIDE_CREEP =   62.5f; // mm/s      bucket tips slowly at this speed (was 200)\nconst float SLIDE_ACCEL =  694.1f; // mm/s^2    (was 5000)\nconst float SLIDE_DECEL =  694.1f; // mm/s^2    slowing down\nconst float SLIDE_RETRACT_SPEED =  962.0f; // mm/s    RETRACT (was SLIDE_MAX). Free speed ~824 at 12 V, ~1150 on a full 4S: PWM saturates\nconst float SLIDE_RETRACT_ACCEL =  925.4f; // mm/s^2  used with SLIDE_RETRACT_SPEED: raise it to save time\nconst float SLIDE_RETRACT_DECEL =  925.4f; // mm/s^2  used with SLIDE_RETRACT_SPEED, slowing down\n\n// ---- VIBRATION --------------------------------------------------------------\nconst float VIBRATE_DEG = 7.5f;            // +/- deg (V1 ~ +/-50 us)\nconst int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1\n\n// ---- SEQUENCE ---------------------------------------------------------------\n// ARM / SCOOP: angle name, a number, or HOLD, then its speed in deg/s (0 = ARM_SPEED / SCOOP_SPEED).\n// SLIDE: mm, a name, or HOLD, then a named slide speed. VIBRATE: +/- deg (0 = off).\n// NEXT WHEN: WAIT_MS(ms) | WAIT_ARRIVED(ms) (every axis stopped) | WAIT_ARM_ARRIVED(ms) | WAIT_SCOOP_ARRIVED(ms)\n//            | WAIT_SLIDE_ARRIVED(ms) | WAIT_ARM(%) | WAIT_SCOOP(%) | WAIT_SLIDE(%)\n//            \"arrived\" + ms waits after arriving; a negative ms goes that long before arriving.\n// OR AFTER: ms after which the step ends anyway (something stuck). 0 = no limit.\n// A.ACC% A.DEC% / S.ACC% S.DEC%: this row's arm / scoop move speeds up / slows down at that % of\n//            ARM_ / SCOOP_ ACCEL and DECEL (100 = those; 1-255). Only that one move.\n// FLAG (testing): STEP_RUN normal | STEP_SKIP this row doesn't run | STEP_STOP the run ends after this row\n//            and the robot goes back to the start pose. Leave every row on STEP_RUN for the competition.\n// HOLD = that axis keeps doing what it was doing: a move still running when its step ends keeps going.\nconst Step SEQUENCE[] PROGMEM = {\n//  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG\n  { \"IDLE\",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"SCOOP_DOWN\",  HOLD,        0,         S_DOWN,    206.8,      HOLD,     0,                   0,           WAIT_MS(624),          0,       100,   100,   251,   100,   STEP_RUN  },  // V2: scoop first\n  { \"ARM_DOWN\",    A_DOWN,      172.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       251,   70,    100,   100,   STEP_RUN  },  // V2\n  { \"SWEEP_UP\",    A_PEAK,      89.3,      S_SCOOP,   77.1,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s\n  { \"SWEEP_DOWN\",  A_SCOOP,     40.7,      HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // second half: arm drops, the scoop's move carries on\n  { \"WAIT\",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(0),            0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"PICKUP\",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_SCOOP(75),        0,       100,   100,   85,    200,   STEP_RUN  },  // V2 (V1 used 100 ms)\n  { \"LIFT\",        A_TRANSFER,  172.3,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM(10),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup\n  { \"CARRY\",       HOLD,        0,         S_CARRY,   45.8,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V1: carry angle until nearly up\n  { \"POUR\",        HOLD,        0,         S_POUR,    206.8,      HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // V1: tip into the bucket\n  { \"VIBRATE\",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(1559),         0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out\n  { \"EXTEND\",      A_MOVE,      0,         S_DOWN,    206.4,      X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // arm clears while slides go\n  { \"CREEP\",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       8316,    100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop\n  { \"TIP_HOLD\",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(3119),         0,       100,   100,   100,   100,   STEP_RUN  },  // let the rocks fall\n  { \"RETRACT\",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // back in, fast\n};\n"}, {"file": "slow_30_s.h", "text": "// =============================================================================\n//  DOVER SEQUENCE  -  the robot's state machine. One row = one step.\n//\n//  Edit here, or open this file in tools/sequence_editor.html (it shows the\n//  3D twin and the timing, and saves straight back to this file).\n//  Whichever was edited last wins: see AGENTS.md \"Sequence sync\".\n//\n//  ANGLES   ARM:   degrees forward of vertical (+ = out toward the intake floor)\n//           SCOOP: degrees relative to the arm (0 = CAD pose: blade flat on top, arm vertical)\n//  SLIDES   mm from fully retracted.   SPEEDS deg/s, mm/s.   TIMES ms.\n// =============================================================================\n#pragma once\n#include \"SequenceTypes.h\"\n#define PROGRAM_NAME \"Slow 30 s\"   // the editor's Program menu: which version of the sequence this is\n\n// ---- ARM ANGLES (deg) -------------------------------------------------------\nconst float A_START    =  -31.6f;  // power-on pose (V2 940)\nconst float A_DOWN     =  100.3f;  // V2 200\nconst float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)\nconst float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)\nconst float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)\nconst float A_MOVE     =   35.9f;  // clear of the slides (V2 500)\nconst float A_RESET    =    35.9f;   // Reset / STEP_STOP: the arm waits here while the slides come in (added: = A_MOVE)\n\n// ---- SCOOP ANGLES (deg) -----------------------------------------------------\nconst float S_START    =    5.4f;  // power-on pose (V2 2300 us)\nconst float S_DOWN     = -250.0f;  // V2 700 us\nconst float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 1900 us)\nconst float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)\nconst float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)\nconst float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)\nconst float S_RESET    =  -250.0f;   // Reset / STEP_STOP: the scoop waits here while the slides come in (added: = S_DOWN)\n\n// ---- SLIDE POSITIONS (mm) ---------------------------------------------------\nconst float X_CREEP    =  1665.0f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)\nconst float X_TIP      =  1780.0f;  // bucket fully tipped (was 3220). PAST the end stop (~1694 mm, 15 Oct logs): CREEP ends in a STALL\nconst float X_NEW1     =   200.0f;\n\n// ---- SPEEDS -----------------------------------------------------------------\n// Servo moves: a step's speed (0 = the default below), speeding up at ACCEL and slowing down\n// at DECEL. Above about the servo's own top speed (FAST) the servo can't keep up and\n// \"arrived\" comes early.\nconst float ARM_SPEED   =   96.1f; // deg/s     default arm speed\nconst float ARM_FAST    =  114.8f; // deg/s     arm servos' own top speed (430 / 1.2 gearing): the old INSTANT\nconst float ARM_ACCEL   =  164.2f; // deg/s^2   every arm move\nconst float ARM_DECEL   =  164.2f; // deg/s^2   every arm move, slowing down\nconst float SCOOP_SPEED =  144.2f; // deg/s     default scoop speed\nconst float SCOOP_FAST  =  137.8f; // deg/s     scoop servo's own top speed: the old INSTANT\nconst float SCOOP_ACCEL =  231.0f; // deg/s^2   every scoop move\nconst float SCOOP_DECEL =  231.0f; // deg/s^2   every scoop move, slowing down\n// Slide moves pick one of these speeds (not a number), so they stay fixed and tuned.\n// ACCEL = speeding up, DECEL = slowing down (the retract speed brings its own pair).\nconst float SLIDE_FAST  =  256.3f; // mm/s      (was 1000 at the old scale)\nconst float SLIDE_CREEP =   41.7f; // mm/s      bucket tips slowly at this speed (was 200)\nconst float SLIDE_ACCEL =  308.0f; // mm/s^2    (was 5000)\nconst float SLIDE_DECEL =  308.0f; // mm/s^2    slowing down\nconst float SLIDE_RETRACT_SPEED =  640.8f; // mm/s    RETRACT (was SLIDE_MAX). Free speed ~824 at 12 V, ~1150 on a full 4S: PWM saturates\nconst float SLIDE_RETRACT_ACCEL =  410.6f; // mm/s^2  used with SLIDE_RETRACT_SPEED: raise it to save time\nconst float SLIDE_RETRACT_DECEL =  410.6f; // mm/s^2  used with SLIDE_RETRACT_SPEED, slowing down\n\n// ---- VIBRATION --------------------------------------------------------------\nconst float VIBRATE_DEG = 7.5f;            // +/- deg (V1 ~ +/-50 us)\nconst int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1\n\n// ---- SEQUENCE ---------------------------------------------------------------\n// ARM / SCOOP: angle name, a number, or HOLD, then its speed in deg/s (0 = ARM_SPEED / SCOOP_SPEED).\n// SLIDE: mm, a name, or HOLD, then a named slide speed. VIBRATE: +/- deg (0 = off).\n// NEXT WHEN: WAIT_MS(ms) | WAIT_ARRIVED(ms) (every axis stopped) | WAIT_ARM_ARRIVED(ms) | WAIT_SCOOP_ARRIVED(ms)\n//            | WAIT_SLIDE_ARRIVED(ms) | WAIT_ARM(%) | WAIT_SCOOP(%) | WAIT_SLIDE(%)\n//            \"arrived\" + ms waits after arriving; a negative ms goes that long before arriving.\n// OR AFTER: ms after which the step ends anyway (something stuck). 0 = no limit.\n// A.ACC% A.DEC% / S.ACC% S.DEC%: this row's arm / scoop move speeds up / slows down at that % of\n//            ARM_ / SCOOP_ ACCEL and DECEL (100 = those; 1-255). Only that one move.\n// FLAG (testing): STEP_RUN normal | STEP_SKIP this row doesn't run | STEP_STOP the run ends after this row\n//            and the robot goes back to the start pose. Leave every row on STEP_RUN for the competition.\n// HOLD = that axis keeps doing what it was doing: a move still running when its step ends keeps going.\nconst Step SEQUENCE[] PROGMEM = {\n//  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG\n  { \"IDLE\",        A_START,     ARM_FAST,  S_START,   SCOOP_FAST, HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"SCOOP_DOWN\",  HOLD,        0,         S_DOWN,    137.8,      HOLD,     0,                   0,           WAIT_MS(936),          0,       100,   100,   251,   100,   STEP_RUN  },  // V2: scoop first\n  { \"ARM_DOWN\",    A_DOWN,      114.8,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       251,   70,    100,   100,   STEP_RUN  },  // V2\n  { \"SWEEP_UP\",    A_PEAK,      59.5,      S_SCOOP,   51.4,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V2 scoopSweep, first half: arm lifts, scoop turns for 2 s\n  { \"SWEEP_DOWN\",  A_SCOOP,     27.1,      HOLD,      0,          HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // second half: arm drops, the scoop's move carries on\n  { \"WAIT\",        HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(0),            0,       100,   100,   100,   100,   STEP_RUN  },\n  { \"PICKUP\",      HOLD,        0,         S_PICKUP,  SCOOP_FAST, HOLD,     0,                   0,           WAIT_SCOOP(75),        0,       100,   100,   85,    200,   STEP_RUN  },  // V2 (V1 used 100 ms)\n  { \"LIFT\",        A_TRANSFER,  114.8,     HOLD,      0,          HOLD,     0,                   0,           WAIT_ARM(10),          0,       100,   100,   100,   100,   STEP_RUN  },  // V1: 1 s lift, scoop still at pickup\n  { \"CARRY\",       HOLD,        0,         S_CARRY,   30.5,       HOLD,     0,                   0,           WAIT_ARM_ARRIVED(0),   0,       100,   100,   100,   100,   STEP_RUN  },  // V1: carry angle until nearly up\n  { \"POUR\",        HOLD,        0,         S_POUR,    137.8,      HOLD,     0,                   0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // V1: tip into the bucket\n  { \"VIBRATE\",     HOLD,        0,         HOLD,      0,          HOLD,     0,                   VIBRATE_DEG, WAIT_MS(2341),         0,       100,   100,   100,   100,   STEP_RUN  },  // V1: shake the rest out\n  { \"EXTEND\",      A_MOVE,      0,         S_DOWN,    137.5,      X_CREEP,  SLIDE_FAST,          0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // arm clears while slides go\n  { \"CREEP\",       HOLD,        0,         HOLD,      0,          X_TIP,    SLIDE_CREEP,         0,           WAIT_ARRIVED(0),       12484,   100,   100,   100,   100,   STEP_RUN  },  // blends from fast, no stop\n  { \"TIP_HOLD\",    HOLD,        0,         HOLD,      0,          HOLD,     0,                   0,           WAIT_MS(4682),         0,       100,   100,   100,   100,   STEP_RUN  },  // let the rocks fall\n  { \"RETRACT\",     HOLD,        0,         HOLD,      0,          200,      SLIDE_RETRACT_SPEED, 0,           WAIT_ARRIVED(0),       0,       100,   100,   100,   100,   STEP_RUN  },  // back in, fast\n};\n"}]</script>
 <script type="text/plain" id="snap-date">16 Oct 2026</script>
 <script src="three.min.js"></script>
 <script src="twin_model.js"></script>
@@ -906,8 +914,18 @@ function loadSequence(text, label) {
     M.consts.splice(M.consts.indexOf(ac) + 1, 0, { name: dn, type: ac.type, value: ac.value, group: ac.group, line: -1, comment: `slowing down (added: = ${an})` });
     added.push(dn);
   }
-  M.dirty = added.length > 0; setFileChip(label);
+  // the reset poses (16 Oct): where arm / scoop wait while the slides come in; default = the EXTEND pose, which is clear of the slides
+  const addedP = [];
+  for (const [pn, from, fb, grp] of [["A_RESET", "A_MOVE", "A_START", "arm"], ["S_RESET", "S_DOWN", "S_START", "scoop"]]) {
+    if (M.consts.some((c) => c.name === pn)) continue;
+    const src = M.consts.find((c) => c.name === from) || M.consts.find((c) => c.name === fb); if (!src) continue;
+    const inGroup = M.consts.filter((c) => c.group === src.group), last = inGroup[inGroup.length - 1];
+    M.consts.splice(M.consts.indexOf(last) + 1, 0, { name: pn, type: src.type, value: src.value, group: src.group, line: -1, comment: `Reset / STEP_STOP: the ${grp} waits here while the slides come in (added: = ${src.name})` });
+    addedP.push(pn);
+  }
+  M.dirty = added.length + addedP.length > 0; setFileChip(label);
   if (added.length) setTimeout(() => toast(`Added ${added.join(", ")} (= the accels, so the motion is the same): the robot's code needs them. Save to keep them.`), 0);
+  if (addedP.length) setTimeout(() => toast(`Added ${addedP.join(", ")}: where the arm and scoop wait during ↺ Reset until the slides are in (= the EXTEND pose). Save to keep them.`), added.length ? 2600 : 0);
 }
 function loadConfig(text) {
   const doc = parseHeader(text);
@@ -916,11 +934,120 @@ function loadConfig(text) {
   // derived values RobotConfig computes with expressions
   M.cfgDirty = false;
 }
-function sequenceText() { return writeHeader(M.doc, M.consts, M.steps); }
+function sequenceText() { return withProgName(writeHeader(M.doc, M.consts, M.steps), PROG.list[PROG.i] && PROG.list[PROG.i].name); }
+// ---- programs: whole-sequence variants (Max speed, Slow 20 s…) in Robot_Controller_V2_1/programs/<name>.h.
+// Sequence.h is a copy of the selected one (what the robot runs); #define PROGRAM_NAME says which.
+const PROG = { list: [], i: 0 };   // {name, file, saved: text on disk (or null = new), mem: {doc, consts, steps, dirty} while not selected, total}
+const progNameOf = (txt) => { const m = /^#define PROGRAM_NAME\s+"([^"]*)"/m.exec(txt || ""); return m ? m[1] : null; };
+const progFile = (name) => (String(name).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "program") + ".h";
+const progClean = (n) => String(n || "").replace(/[^A-Za-z0-9 ._+-]/g, "").trim().slice(0, 20);
+function withProgName(txt, name) {
+  if (!name) return txt;
+  const line = `#define PROGRAM_NAME "${name}"   // the editor's Program menu: which version of the sequence this is`;
+  if (/^#define PROGRAM_NAME .*$/m.test(txt)) return txt.replace(/^#define PROGRAM_NAME .*$/m, line);
+  return txt.replace(/^(#include "SequenceTypes\.h"[^\n]*\n)/m, `$1${line}\n`);
+}
+function progText(k) {   // the program's sequence as it is now (the selected one is live in M)
+  const p = PROG.list[k]; if (!p) return "";
+  if (k === PROG.i) return sequenceText();
+  if (p.mem) return withProgName(writeHeader(p.mem.doc, p.mem.consts, p.mem.steps), p.name);
+  return p.saved || "";
+}
+const progDirty = (k) => { const p = PROG.list[k]; return !!p && (k === PROG.i ? M.dirty : !!(p.mem && p.mem.dirty)) || (!!p && p.saved === null); };
+const anyProgDirty = () => PROG.list.some((p, k) => progDirty(k));
+function progTotal(k) {   // predicted run time of program k (simulated with its numbers)
+  if (k === PROG.i) return SIM ? SIM.total : 0;
+  const keep = [M.doc, M.consts, M.steps];
+  try { const d = PROG.list[k].mem || (() => { const doc = parseHeader(progText(k)); return { doc, consts: doc.consts.map((c) => ({ ...c })), steps: doc.steps.map((x) => ({ ...x })) }; })();
+    M.doc = d.doc; M.consts = d.consts; M.steps = d.steps; return simulate().total; }
+  catch (e) { return 0; } finally { [M.doc, M.consts, M.steps] = keep; }
+}
+function renderProgSel() {
+  const sel = $("progSel"); if (!sel) return;
+  const opts = PROG.list.map((p, k) => `<option value="${k}"${k === PROG.i ? " selected" : ""}>${esc(p.name || "This sequence")} · ${(k === PROG.i ? (SIM ? SIM.total : 0) : p.total ?? (p.total = progTotal(k))).toFixed(1)} s${progDirty(k) ? " •" : ""}</option>`).join("");
+  const html = opts + `<option disabled>──────────</option><option value="new">＋ New program (scaled copy)…</option>` + (PROG.list.length > 1 ? `<option value="manage">Rename / delete…</option>` : "");
+  if (sel.innerHTML !== html) sel.innerHTML = html;
+  sel.value = String(PROG.i);
+}
+function progStash() { const p = PROG.list[PROG.i]; if (p) { p.mem = { doc: M.doc, consts: M.consts, steps: M.steps, dirty: M.dirty }; p.total = SIM ? SIM.total : p.total; } }
+function progSwitch(k) {
+  if (k === PROG.i || !PROG.list[k]) { renderProgSel(); return; }
+  togglePlay(false); progStash(); PROG.i = k;
+  const p = PROG.list[k];
+  if (p.mem) { M.doc = p.mem.doc; M.consts = p.mem.consts; M.steps = p.mem.steps; M.dirty = p.mem.dirty; p.mem = null; }
+  else { const keepLabel = F.label; loadSequence(p.saved ?? p.pending, keepLabel); }
+  afterLoad(); renderProgSel(); setFileChip();
+  toast(`Program: ${p.name}. Edits apply to this one; Save puts it in Sequence.h, so the robot runs it after you upload.`);
+}
+// scale a whole program in time: speeds ×k, accels / decels ×k², waits and limits ÷k (the same as the robot's 'k' command)
+function scaledText(txt, k, name) {
+  const doc = parseHeader(txt), consts = doc.consts.map((c) => ({ ...c })), steps = doc.steps.map((x) => ({ ...x }));
+  const r1 = (v) => Math.round(v * 10) / 10;
+  for (const c of consts) {
+    if (/^(ARM|SCOOP)_(SPEED|FAST)$|^SLIDE_(FAST|CREEP|RETRACT_SPEED)$/.test(c.name)) c.value = r1(c.value * k);
+    else if (/_(ACCEL|DECEL)$/.test(c.name)) c.value = r1(c.value * k * k);
+  }
+  const cm = {}; for (const c of consts) cm[c.name] = c.value;
+  for (const st of steps) {
+    for (const f of ["armV", "scoopV"]) { const t = String(st[f]).trim(); if (/^-?[\d.]+$/.test(t) && +t > 0) st[f] = fmtV(r1(+t * k)); }
+    if (!isPct(st.waitType)) { const v = +st.waitVal; if (Number.isFinite(v) && v !== 0) st.waitVal = String(Math.max(-32768, Math.min(32767, Math.round(v / k)))); }
+    if (+st.limit > 0) st.limit = String(Math.min(65535, Math.round(+st.limit / k)));
+  }
+  return withProgName(writeHeader(doc, consts, steps), name);
+}
+function scaledTo(txt, seconds, name) {   // a scaled copy that takes `seconds` in the twin (a few passes: rounding)
+  const keep = [M.doc, M.consts, M.steps], timeOf = (t) => { const d = parseHeader(t); M.doc = d; M.consts = d.consts.map((c) => ({ ...c })); M.steps = d.steps.map((x) => ({ ...x })); return simulate().total; };
+  try {
+    const t0 = timeOf(txt); let k = t0 / seconds, out = txt;
+    for (let n = 0; n < 4; n++) { out = scaledText(txt, k, name); const t = timeOf(out); if (Math.abs(t - seconds) < 0.02) break; k *= t / seconds; }
+    return out;
+  } finally { [M.doc, M.consts, M.steps] = keep; }
+}
+function progNew(name, seconds) {
+  name = progClean(name); if (!name) { toast("Give the program a name"); return false; }
+  if (PROG.list.some((p) => (p.name || "").toLowerCase() === name.toLowerCase())) { toast(`There's already a program called ${name}`); return false; }
+  const cur = PROG.list[PROG.i]; if (cur && !cur.name) cur.name = progClean(progNameOf(sequenceText())) || "Max speed";
+  const base = sequenceText(), txt = seconds > 0 ? scaledTo(base, seconds, name) : withProgName(base, name);
+  PROG.list.push({ name, file: progFile(name), saved: null, mem: null, pending: txt, total: null });
+  const k = PROG.list.length - 1; progStash(); PROG.i = k;
+  loadSequence(txt, F.label); M.dirty = true; afterLoad(); renderProgSel(); setFileChip();
+  toast(`New program ${name}${seconds > 0 ? ` (everything scaled to ${seconds} s)` : ""}. Save writes programs/${progFile(name)} and puts it in Sequence.h.`);
+  return true;
+}
+function progMenu(kind) {
+  const sel = $("progSel"), cur = PROG.list[PROG.i], t = SIM ? SIM.total : 10;
+  const html = kind === "new"
+    ? `<div class="ph">New program: a copy of <b>${esc(cur ? cur.name || "this sequence" : "")}</b>, with every speed, accel and wait scaled so the whole run takes the time you give (blank = same).</div>
+       <div class="adrow"><label>Name <input id="pgName" value="Slow ${Math.round(t * 2)} s" maxlength="20"></label></div>
+       <div class="adrow"><label>Run time <input id="pgSec" class="num" type="number" min="1" step="1" value="${Math.round(t * 2)}"> s</label><span class="hint">now ${t.toFixed(1)} s</span></div>
+       <button data-pg="create"><b>Create</b><span>and switch to it</span></button>`
+    : `<div class="ph">Program <b>${esc(cur.name || "")}</b></div>
+       <div class="adrow"><label>Name <input id="pgName" value="${esc(cur.name || "")}" maxlength="20"></label></div>
+       <button data-pg="rename"><b>Rename</b><span>the file is renamed on Save</span></button>
+       <button data-pg="delete"><b>Delete this program</b><span>its file in programs/ is removed on Save</span></button>`;
+  openPop("progPop", sel, html, (ev) => {
+    const b = ev.target.closest("button[data-pg]"); if (!b) return;
+    if (b.dataset.pg === "create") { if (progNew($("pgName").value, +$("pgSec").value || 0)) closePop(); }
+    if (b.dataset.pg === "rename") { const n = progClean($("pgName").value); if (!n) return; if (PROG.list.some((p, k) => k !== PROG.i && (p.name || "").toLowerCase() === n.toLowerCase())) { toast("That name is taken"); return; } if (cur.saved !== null && !cur.oldFile) cur.oldFile = cur.file; cur.name = n; cur.file = progFile(n); M.dirty = true; closePop(); renderProgSel(); setFileChip(); }
+    if (b.dataset.pg === "delete") { if (PROG.list.length < 2) return; if (cur.saved !== null) (PROG.dropped = PROG.dropped || []).push(cur.oldFile || cur.file); PROG.list.splice(PROG.i, 1); PROG.i = Math.min(PROG.i, PROG.list.length - 1); const p = PROG.list[PROG.i]; if (p.mem) { M.doc = p.mem.doc; M.consts = p.mem.consts; M.steps = p.mem.steps; M.dirty = true; p.mem = null; } else { loadSequence(p.saved ?? p.pending, F.label); M.dirty = true; } afterLoad(); closePop(); renderProgSel(); setFileChip(); toast("Deleted. Save to remove its file."); }
+  }, "adpop", "dialog");
+  const n = $("pgName"); if (n) { n.focus(); n.select(); }
+}
+$("progSel").onchange = (e) => { const v = e.target.value; if (v === "new" || v === "manage") { renderProgSel(); progMenu(v); return; } progSwitch(+v); };
+// the program list from the files: programs/*.h plus Sequence.h (it wins for its own program: it's what is uploaded)
+function progInit(seqText, files) {
+  const cur = progNameOf(seqText);
+  PROG.list = files.map((f) => ({ name: progNameOf(f.text) || f.file.replace(/\.h$/, ""), file: f.file, saved: f.text, mem: null, total: null }));
+  let k = cur ? PROG.list.findIndex((p) => p.name === cur) : -1;
+  if (k < 0) { PROG.list.unshift({ name: cur, file: progFile(cur || "Max speed"), saved: cur ? null : seqText, mem: null, total: null, unnamed: !cur }); k = 0; }
+  PROG.i = k; PROG.dropped = [];
+  const p = PROG.list[k]; if (p.saved !== null && p.saved !== seqText) p.saved = null;   // the program file is behind Sequence.h: Save brings it up to date
+  if (p.unnamed) p.saved = seqText;
+}
 function configText() { return M.cfgDoc ? writeHeader(M.cfgDoc, M.cfgConsts, []) : ""; }
 function markDirty(undoWindowMs) { M.dirty = true; histNote(undoWindowMs); setFileChip(); scheduleSim(); }
 // names the firmware's own code uses (Robot_Controller_V2_1.ino): never rename or delete these
-const FW_NAMES = ["A_START", "S_START", "X_CREEP", "X_TIP", "ARM_SPEED", "ARM_ACCEL", "ARM_DECEL", "SCOOP_SPEED", "SCOOP_ACCEL", "SCOOP_DECEL", "SLIDE_FAST", "SLIDE_ACCEL", "SLIDE_DECEL",
+const FW_NAMES = ["A_START", "S_START", "A_RESET", "S_RESET", "X_CREEP", "X_TIP", "ARM_SPEED", "ARM_ACCEL", "ARM_DECEL", "SCOOP_SPEED", "SCOOP_ACCEL", "SCOOP_DECEL", "SLIDE_FAST", "SLIDE_ACCEL", "SLIDE_DECEL",
                   "SLIDE_RETRACT_SPEED", "SLIDE_RETRACT_ACCEL", "SLIDE_RETRACT_DECEL", "VIBRATE_DEG", "VIBRATE_HALF_PERIOD_MS"];
 const RESERVED = ["HOLD", "WAIT_MS", "WAIT_ARRIVED", "WAIT_ARM_ARRIVED", "WAIT_SCOOP_ARRIVED", "WAIT_SLIDE_ARRIVED", "WAIT_ARM", "WAIT_SCOOP", "WAIT_SLIDE", "SEQUENCE", "Step"];
 const VAL_FIELDS = ["arm", "armV", "scoop", "scoopV", "slide", "speed", "vib"];
@@ -1136,8 +1263,13 @@ function simulate(opts = {}) {   // opts.noStop: ignore STEP_STOP (to draw the s
       frames.push({ t, i, aT: arm.target, aC: arm.cmd, sT: scoop.target, sC: scoop.cmd, sO: scoop.out(t), x: slidePos, xT: slideTarget, xv, va: scoop.vib, vib: scoop.vib > 0, rs: !!reset });
       nextFrame += 0.01;
     }
-    if (reset) {   // like the firmware's startReset(): done when the moves are (8 s at most)
-      if ((arm.mode === "idle" && scoop.mode === "idle" && slide.done) || t - reset.t0 >= 8) { reset.t1 = t; done = true; break; }
+    if (reset) {   // like the firmware: 1 = slides in with arm / scoop at A_RESET / S_RESET, 2 = then to the start pose
+      if (reset.phase === 1 && t - reset.t0 >= 12) { reset.t1 = t; done = true; break; }   // slides never in: the servos stay clear
+      if (reset.phase === 1 && slide.done) {
+        reset.phase = 2; reset.t2 = t;
+        arm.moveTo(V("A_START", -58), t, ARM_SPEED * 0.5, ARM_ACCEL * 0.25, ARM_DECEL * 0.25);
+        scoop.moveTo(V("S_START", 0), t, SC_SPEED * 0.5, SC_ACCEL * 0.25, SC_DECEL * 0.25);
+      } else if (reset.phase === 2 && ((arm.mode === "idle" && scoop.mode === "idle") || t - reset.t2 >= 6)) { reset.t1 = t; done = true; break; }
       t += dt; continue;
     }
     let ok = met();
@@ -1145,11 +1277,11 @@ function simulate(opts = {}) {   // opts.noStop: ignore STEP_STOP (to draw the s
     if (ok) {
       spans[spans.length - 1].t1 = t;
       if (rows[i].stop) {   // STEP_STOP: back to the start pose (jog speeds, like ↺ Reset), then DONE
-        reset = { after: i, t0: t, t1: null };
+        reset = { after: i, t0: t, t1: null, phase: 1 };
         for (const ax of ["arm", "scoop", "slide"]) closeK(ax, true);
         scoop.vib = 0;
-        arm.moveTo(V("A_START", -58), t, ARM_SPEED * 0.5, ARM_ACCEL * 0.25, ARM_DECEL * 0.25);
-        scoop.moveTo(V("S_START", 0), t, SC_SPEED * 0.5, SC_ACCEL * 0.25, SC_DECEL * 0.25);
+        arm.moveTo(V("A_RESET", V("A_START", -58)), t, ARM_SPEED * 0.5, ARM_ACCEL * 0.25, ARM_DECEL * 0.25);   // clear of the slides first
+        scoop.moveTo(V("S_RESET", V("S_START", 0)), t, SC_SPEED * 0.5, SC_ACCEL * 0.25, SC_DECEL * 0.25);
         slide.setLimits(300, SLIDE_ACCEL, SLIDE_DECEL); slide.move(slidePos, 0, t, 0, 0); slideTarget = 0; slideUsed = true;
         continue;
       }
@@ -1203,7 +1335,7 @@ function runSim() {
   $("totalTime").textContent = SIM.total.toFixed(2) + " s";
   if (S.focus && !KD && !RT && !S.playing) refocus();
   if (S.t > SIM.total) S.t = SIM.total;
-  updateStepTimes(); drawTimeline(); drawAt(S.t); refreshStory(); updIssues();
+  updateStepTimes(); drawTimeline(); drawAt(S.t); refreshStory(); updIssues(); renderProgSel();
 }
 
 // ============================================================================
@@ -1219,7 +1351,8 @@ function holdState(armDeg, scoopDeg) {
 // UI: step table
 // ============================================================================
 const S = { t: 0, sel: -1, playing: false, rate: 1, live: null, preview: null, stopAt: null, pin: null, focus: null, cue: null };   // focus = a step / move whose end the view follows through edits; cue = where you paused or scrubbed (Play resumes there)
-const JOG = { dir: 0, last: 0, raf: 0, held: new Set(), swallow: new Set() };   // ← / → held on the timeline: the playhead runs (dir -1 / +1)
+const JOG = { dir: 0, last: 0, raf: 0, held: new Set(), swallow: new Set() };
+const RST = { on: false, t0: 0, timer: 0 };   // ↺ Reset waiting for the slides to come in (then the start pose)   // ← / → held on the timeline: the playhead runs (dir -1 / +1)
 const SJOG = { dir: 0, t: 0 }, SLIDE_JOG_PWM = 110;   // pose box ◀ In / Out ▶: gentle, but above STALL_MIN_PWM (90) so the stall cut still protects it
 const WAITS = ["WAIT_MS", "WAIT_ARRIVED", "WAIT_ARM_ARRIVED", "WAIT_SCOOP_ARRIVED", "WAIT_SLIDE_ARRIVED", "WAIT_ARM", "WAIT_SCOOP", "WAIT_SLIDE"];
 const WAIT_LABEL = { WAIT_MS: "after ms", WAIT_ARRIVED: "all arrived ± ms", WAIT_ARM_ARRIVED: "arm arrived ± ms", WAIT_SCOOP_ARRIVED: "scoop arrived ± ms",
@@ -2439,6 +2572,7 @@ function playRange() {
   return { scope: sc, i0: i, t0: sp.t0, t1: SIM.total, label: "end of the run" };
 }
 function play() {
+  resetCancel();
   if (JOG.dir) { for (const k of JOG.held) JOG.swallow.add(k); JOG.held.clear(); jogStop(); }   // keys still down: ignored until pressed again
   if (DRIVE.mode === "upload") { playUpload(); return; }
   const r = playRange(); if (!r) return;
@@ -2726,10 +2860,10 @@ $("tiltIn").oninput = (e) => { const v = parseFloat(e.target.value); if (!isNaN(
 // ============================================================================
 // FILES
 // ============================================================================
-const F = { seqHandle: null, cfgHandle: null, dirHandle: null, rootDir: null, subName: "", remembered: null, label: "" };
+const F = { seqHandle: null, cfgHandle: null, dirHandle: null, rootDir: null, subName: "", remembered: null, label: "", sub: null, progDir: null };
 function setFileChip(label) {
   if (label !== undefined) F.label = label;
-  const el = $("fileChip"), dirty = M.dirty || M.cfgDirty;
+  const el = $("fileChip"), dirty = M.dirty || M.cfgDirty || (PROG.list.length > 0 && anyProgDirty());
   el.innerHTML = `<span class="fc-l">${F.label}</span>${dirty ? `<span class="fc-d">&nbsp;· unsaved</span>` : ""}`;
   el.title = el.textContent.replace(/\u00a0/g, " ") + (dirty ? " changes" : "");
   el.classList.toggle("dirty", dirty);
@@ -2766,6 +2900,9 @@ async function openDir(handle) {
   parseHeader(txt).steps.length || (() => { throw new Error("That Sequence.h has no SEQUENCE table."); })();
   F.seqHandle = sh; F.dirHandle = dir; F.rootDir = sub !== dir ? dir : null; F.subName = sub.name; F.remembered = dir;
   loadSequence(txt, `<b>${esc(sub.name)}/Sequence.h</b>`);
+  const files = []; F.progDir = null;
+  try { F.progDir = await sub.getDirectoryHandle("programs"); for await (const [n, h] of F.progDir.entries()) if (h.kind === "file" && /\.h$/i.test(n)) files.push({ file: n, text: await (await h.getFile()).text() }); } catch (e) {}
+  files.sort((a, b) => a.file.localeCompare(b.file)); F.sub = sub; progInit(txt, files);
   try { const ch = await sub.getFileHandle("RobotConfig.h"); loadConfig(await (await ch.getFile()).text()); F.cfgHandle = ch; } catch (e) { F.cfgHandle = null; }
   await idb("put", "dir", dir);
   afterLoad(); toast("Opened " + sub.name);
@@ -2786,9 +2923,22 @@ async function save() {
   try {
     const txt = sequenceText();
     let w = await F.seqHandle.createWritable(); await w.write(txt); await w.close();
+    if (PROG.list.length && PROG.list[PROG.i].name) {   // programs/: every program that changed (and the selected one, so it matches Sequence.h)
+      const dir = F.progDir || (F.progDir = await F.sub.getDirectoryHandle("programs", { create: true }));
+      for (let k = 0; k < PROG.list.length; k++) {
+        const p = PROG.list[k]; if (!p.name) continue;
+        const t = progText(k); if (p.saved === t && !p.oldFile) continue;
+        const fh = await dir.getFileHandle(p.file, { create: true }), pw = await fh.createWritable(); await pw.write(t); await pw.close();
+        if (p.oldFile && p.oldFile !== p.file) { try { await dir.removeEntry(p.oldFile); } catch (e) {} p.oldFile = null; }
+        p.saved = t; if (p.mem) p.mem.dirty = false; p.pending = null;
+      }
+      for (const f of PROG.dropped || []) { try { await dir.removeEntry(f); } catch (e) {} }
+      PROG.dropped = [];
+    }
     M.doc = parseHeader(txt); M.consts = M.doc.consts.map((c) => ({ ...c })); M.steps = M.doc.steps.map((s) => ({ ...s })); M.dirty = false;
     if (M.cfgDirty && F.cfgHandle) { const ct = configText(); w = await F.cfgHandle.createWritable(); await w.write(ct); await w.close(); M.cfgDoc = parseHeader(ct); M.cfgConsts = M.cfgDoc.consts.map((c) => ({ ...c })); M.cfgDirty = false; }
-    setFileChip(); renderTable(); histReset(); toast("Saved. Upload Robot_Controller_V2_1.ino for the robot to run it on its own.");
+    setFileChip(); renderTable(); histReset(); renderProgSel();
+    toast(`Saved${PROG.list[PROG.i] && PROG.list[PROG.i].name ? ` program ${PROG.list[PROG.i].name} (now in Sequence.h)` : ""}. Upload Robot_Controller_V2_1.ino for the robot to run it on its own.`);
   } catch (e) { toast("Save failed: " + e.message); }
 }
 $("btnSave").onclick = save;
@@ -2799,7 +2949,7 @@ function downloadSeq() { downloadText("Sequence.h", sequenceText()); toast("Down
 $("btnMore").onclick = (e) => openPop("moreMenu", e.currentTarget,
   `<div class="ph">Sequence.h without the folder (other browsers)</div><button role="menuitem" data-m="copy"><b>Copy Sequence.h</b><span>to the clipboard</span></button><button role="menuitem" data-m="dl"><b>Download Sequence.h</b><span>then replace Robot_Controller_V2_1/Sequence.h with it</span></button>`,
   (ev) => { const b = ev.target.closest("button[data-m]"); if (!b) return; closePop(); if (b.dataset.m === "copy") copySeq(); else downloadSeq(); });
-window.addEventListener("beforeunload", (e) => { if (M.dirty || M.cfgDirty) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", (e) => { if (M.dirty || M.cfgDirty || anyProgDirty()) { e.preventDefault(); e.returnValue = ""; } });
 function afterLoad() { S.sel = -1; S.preview = null; S.focus = null; S.pin = null; renderTable(); renderValues(); renderCal(); runSim(); setFileChip(); jogInfo(); renderInspector(); histReset(); }
 
 // ============================================================================
@@ -2974,6 +3124,7 @@ function updBadge() {
   else if (!LIVE.fw) { cls = "busy"; txt = "Connected · waiting for the robot to start up…"; }
   else if (LIVE.cal) { cls = "cal"; txt = "Calibrating servos (Calibrate servos tab)"; }
   else if (LIVE.limp) { cls = "cal"; txt = "Limp · servos and slides are free to move by hand"; }
+  else if (RST.on) { cls = "busy"; txt = "Resetting · slides coming in, then the arm and scoop go to the start pose"; }
   else if (liveRunning()) { cls = "busy"; txt = `Running the uploaded sequence · ${S.live.stepName}`; }
   else if (liveReady()) { cls = "ok"; txt = FOL.on ? (FOL.lining ? "Following · lining up with the timeline…" : "Following the timeline · the robot copies the twin") : "Ready · sliders and buttons move the real robot"; }
   else { cls = "busy"; txt = "Connected · the robot isn't taking commands (press ■ Stop)"; }
@@ -3034,7 +3185,7 @@ function startBenchKeepAlive() {
   }, 50);
 }
 async function liveClose() {
-  slideJogEnd(); FOL.on = false; FOL.lining = false; togglePlay(false);
+  slideJogEnd(); resetCancel(); FOL.on = false; FOL.lining = false; togglePlay(false);
   DRIVE.mode = "twin"; UP.active = null; UP.pending = null; LIVE.paused = false; runLogEnd();
   try { if (LIVE.reader) await LIVE.reader.cancel(); } catch (e) {}
   try { if (LIVE.writer) LIVE.writer.releaseLock(); } catch (e) {}
@@ -3082,6 +3233,7 @@ function onLine(line) {
   if (line.startsWith("#")) logHeadLine(line);
   if (RUNLOG.cur) runLogLine(line, line.split(","));
   if (line.startsWith("#STATES,")) LIVE.stepNames = line.split(",").slice(1);
+  if (line.startsWith("#PROGRAM,")) LIVE.prog = line.slice(9).trim();
   if (line.startsWith("#STEP,")) {   // answer to 'l': rebuild the names if #STATES was missed
     const p = line.split(","), i = +p[1];
     LIVE.stepNames[0] = "IDLE"; LIVE.stepNames[i + 1] = p[2]; LIVE.stepNames[i + 2] = "DONE";
@@ -3146,15 +3298,17 @@ function followPose() {
   const p = S.preview;
   if (p) return { a: p.arm, s: p.scoop, x: p.x, v: 0, vib: 0 };
   const d = S.playing ? 1 : JOG.dir, lead = 0.04 * S.rate * d;   // aim one message ahead so the robot isn't a step behind (← : behind)
-  const f = frameAt(Math.max(0, Math.min(S.t + lead, SIM ? SIM.total : 0)));
-  return { a: f.aC, s: f.sC, x: f.x, v: d ? (f.xv || 0) * S.rate * d : 0, vib: d ? f.va || 0 : 0 };   // no shaking while you scrub or tune
+  const T = SIM ? SIM.total : 0, f = frameAt(Math.max(0, Math.min(S.t + lead, T)));
+  // the slides aim further ahead (~3 messages): a late message must not let them catch up with their target and stop
+  const fx = d ? frameAt(Math.max(0, Math.min(S.t + 0.12 * S.rate * d, T))) : f;
+  return { a: f.aC, s: f.sC, x: fx.x, v: d ? (fx.xv || 0) * S.rate * d : 0, vib: d ? f.va || 0 : 0 };   // no shaking while you scrub or tune
 }
 function followCmd() {
   const q = followPose(), x = FOL.slides ? Math.max(0, Math.min(q.x, FOL.xLimit)) : -1;
   return `P ${q.a.toFixed(1)} ${q.s.toFixed(1)} ${Math.round(x)} ${Math.round(Math.abs(q.v) > 0.5 ? q.v : 0)} ${q.vib > 0 ? +q.vib.toFixed(1) : 0}`;
 }
 function followSend(force) {
-  if (!followActive() || FOL.lining && !force) return;
+  if (!followActive() || (FOL.lining || RST.on) && !force) return;   // lining up / resetting: the A / S / o moves own the robot
   const now = performance.now(), wait = 40 - (now - FOL.lastSend);
   if (wait > 0 && !force) { clearTimeout(FOL.trail); FOL.trail = setTimeout(() => followSend(), wait + 1); return; }   // throttled: send the latest pose a bit later
   const cmd = followCmd();
@@ -3213,7 +3367,7 @@ function unLimpFor() {   // power the servos again where the twin is, before any
 // ■ Stop / X: playback, a line-up, the robot's run, the slides (loose), the shaking. Robot · live drops back to Twin only.
 function stopAll() {
   const upRun = !!(UP.active || (RUNLOG.cur && RUNLOG.cur.kind === "uploaded"));
-  stopPlay(); UP.pending = null; slideJogEnd(true);   // x below stops the slides
+  stopPlay(); UP.pending = null; slideJogEnd(true); resetCancel();   // x below stops the slides
   if (S.live && LIVE.writer) {
     liveSend("x");
     if (upRun) { clearTimeout(RUNLOG.endT); RUNLOG.endT = setTimeout(() => { if (RUNLOG.cur && RUNLOG.cur.kind === "uploaded") runLogEnd(); UP.active = null; setPlayUi(); }, 2500); }
@@ -3222,21 +3376,45 @@ function stopAll() {
   setPlayUi(); updBadge();
 }
 $("btnStop").onclick = (e) => { flash(e.currentTarget); stopAll(); };
+// ↺ Reset, second half: once the robot reports the slides in (and stopped), the arm and scoop go to the start pose
+function resetCancel() { if (!RST.on) return; RST.on = false; clearTimeout(RST.timer); updBadge(); setPlayUi(); }
+function resetWait(a, sc) {
+  RST.on = true; RST.t0 = performance.now(); updBadge();
+  const chk = () => {
+    if (!RST.on) return;
+    if (!S.live) { RST.on = false; return; }
+    const F = S.live.frame, el = performance.now() - RST.t0, home = el > 300 && F && F.x <= 20 && !F.slideBusy;
+    if (home) {
+      RST.on = false; liveSend("A " + a.toFixed(1)); liveSend("S " + sc.toFixed(1));
+      FOL.lastCmd = followCmd(); updBadge(); setPlayUi(); return;
+    }
+    if (el > 12000) {   // never move the scoop back over slides that aren't in (2000 mm at 300 mm/s takes ~7 s)
+      RST.on = false; updBadge(); setPlayUi();
+      toast(`The slides didn't get in within 12 s (at ${F ? Math.round(F.x) : "?"} mm), so the arm and scoop stay at A_RESET / S_RESET. Check the slides, then ↺ Reset again.`);
+      return;
+    }
+    RST.timer = setTimeout(chk, 50);
+  };
+  RST.timer = setTimeout(chk, 150);
+}
 $("btnReset").onclick = (e) => {
   flash(e.currentTarget);
   togglePlay(false); slideJogEnd(true); S.preview = null; S.focus = null; S.pin = null; S.t = 0;
   const C = constMap(), f0 = frameAt(0), a = C.A_START ?? f0.aC, sc = C.S_START ?? f0.sC;
   if (S.live && LIVE.fw) {
     liveSend("x");                                  // stop a run / the slides / shaking first
-    if (LIVE.limp || LIVE.cal) { liveSend(`M ${a.toFixed(1)} ${sc.toFixed(1)}`); LIVE.limp = false; LIVE.cal = false; CAL.on = { 1: false, 2: false, 3: false }; }
-    else { liveSend("A " + a.toFixed(1)); liveSend("S " + sc.toFixed(1)); }
+    // slides out: arm / scoop to A_RESET / S_RESET (clear of the slides) while the slides come in, then the start pose
+    const L = S.live.frame, out = !L || L.x > 20, ar = out ? (C.A_RESET ?? a) : a, sr = out ? (C.S_RESET ?? sc) : sc;
+    if (LIVE.limp || LIVE.cal) { liveSend(`M ${ar.toFixed(1)} ${sr.toFixed(1)}`); LIVE.limp = false; LIVE.cal = false; CAL.on = { 1: false, 2: false, 3: false }; }
+    else { liveSend("A " + ar.toFixed(1)); liveSend("S " + sr.toFixed(1)); }
     liveSend("o 0 300");                            // slides in, gently
+    resetCancel(); if (out) resetWait(a, sc);
     // Drives back to what you had picked (■ Stop / Limp drop Robot · live to Twin only). Following again
     // starts quietly: the robot is already on its way here with smooth A / S / o moves, so no P jump now.
     if (DRIVE.last === "live" && !FOL.on && liveReady()) { FOL.on = true; DRIVE.mode = "live"; logc("# robot follows the timeline again (Reset)"); }
     else if (DRIVE.last === "upload" && DRIVE.mode !== "upload") { if (FOL.on) setFollow(false); DRIVE.mode = "upload"; }
     FOL.lastCmd = followCmd();                      // following: the robot is already being sent here
-    toast(`Robot back to the start pose (A_START, S_START, slides 0 mm)${DRIVE.mode !== "twin" ? ` · Drives: ${DRIVE.mode === "live" ? "Robot · live" : "Robot · uploaded"}` : ""}`);
+    toast(`Robot back to the start pose (A_START, S_START, slides 0 mm${RST.on ? "; arm and scoop wait at A_RESET / S_RESET until the slides are in" : ""})${DRIVE.mode !== "twin" ? ` · Drives: ${DRIVE.mode === "live" ? "Robot · live" : "Robot · uploaded"}` : ""}`);
   } else toast("Twin back at the start");
   drawAt(0); updDriveUi(); setPlayUi(); updBadge();
 };
@@ -3244,7 +3422,7 @@ $("btnLimp").onclick = (e) => {
   flash(e.currentTarget);
   if (!S.live) return;
   if (!LIVE.limp) {
-    togglePlay(false); if (FOL.on) setFollow(false); slideJogEnd(true);
+    togglePlay(false); if (FOL.on) setFollow(false); slideJogEnd(true); resetCancel();
     liveSend("x"); liveSend("L 0"); LIVE.limp = true; CAL.on = { 1: false, 2: false, 3: false };
     toast("Everything is limp: move it by hand. Click Limp again to power the servos at the twin's pose.");
   } else { unLimpFor(); toast("Servos powered at the pose the twin shows"); }
@@ -3386,7 +3564,9 @@ function playUpload() {
   const nm = M.steps[r.i0].name, robotNames = LIVE.stepNames.length > 2 ? LIVE.stepNames.slice(1, -1) : null;
   const ri = robotNames ? robotNames.indexOf(nm) : r.i0;
   if (ri < 0) { toast(`The robot's uploaded sequence has no step called ${nm}: Save and upload first.`); return; }
-  if (robotNames && robotNames.join() !== M.steps.map((s) => s.name).join()) toast("Heads up: the robot's uploaded steps differ from the editor's. It runs its own copy: Save and upload to try these edits.");
+  const pn = PROG.list[PROG.i] && PROG.list[PROG.i].name;
+  if (LIVE.prog && pn && LIVE.prog !== "?" && LIVE.prog !== pn) toast(`Heads up: the robot has program ${LIVE.prog} uploaded, not ${pn}. It runs its own copy: Save and upload to run ${pn}.`);
+  else if (robotNames && robotNames.join() !== M.steps.map((s) => s.name).join()) toast("Heads up: the robot's uploaded steps differ from the editor's. It runs its own copy: Save and upload to try these edits.");
   else if (M.dirty) toast("Heads up: unsaved edits. The robot runs its uploaded copy, not what's on screen.");
   stopPlay(); S.preview = null; S.focus = null; S.pin = null; S.cue = null; S.t = sp.t0; drawAt(S.t);
   liveSend("k " + Math.round(S.rate * 100));
@@ -3455,7 +3635,7 @@ function runLogEnd() {
   const d = r.started, stamp = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}_${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
   const iso = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
   r.name = `run_${stamp}_editor_${r.kind === "live" ? "live" : "uploaded"}${r.label ? "_" + r.label : ""}.csv`;
-  const ed = `#EDITOR,kind=${r.kind},rate=${r.k}` + (r.align ? `,align_ms=${r.align.ms},align_t=${r.align.t.toFixed(3)}` : "") + `,steps=${M.steps.map((s) => s.name).join("|")}`;
+  const ed = `#EDITOR,kind=${r.kind},rate=${r.k}` + (r.align ? `,align_ms=${r.align.ms},align_t=${r.align.t.toFixed(3)}` : "") + `,steps=${M.steps.map((s) => s.name).join("|")}` + (PROG.list[PROG.i] && PROG.list[PROG.i].name ? `,program=${PROG.list[PROG.i].name}` : "");
   r.text = [`#CAPTURE,${iso},editor,${r.kind} ${r.label}`, ed, ...RUNLOG.head, ...r.lines].join("\n") + "\n";
   RUNLOG.last = r; OVL.run = { samples: r.samples, kind: r.kind, when: d, label: r.label, file: r.name };
   r.status = "saving…"; updRunBox(); drawTimeline();
@@ -3737,6 +3917,7 @@ new MutationObserver(() => { T3.ok && T3.theme(); drawTimeline(); }).observe(doc
   const snap = $("snap-seq").textContent, cfg = $("snap-cfg").textContent, date = $("snap-date").textContent.trim();
   try { loadConfig(cfg); } catch (e) {}
   try { loadSequence(snap, `Read-only copy${date ? " (" + date + ")" : ""} · <b>open the robot folder</b> to save`); } catch (e) { toast(e.message); }
+  try { progInit(snap, JSON.parse($("snap-progs").textContent || "[]")); } catch (e) { progInit(snap, []); }
   afterLoad(); setLiveUi(false); setPlayUi();
   // offer to reopen the folder used last time (Chrome keeps the permission handle)
   const dir = await idb("get", "dir");

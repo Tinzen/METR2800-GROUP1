@@ -23,6 +23,9 @@
 #include "ServoAxis.h"
 #include "RobotConfig.h"
 #include "Sequence.h"
+#ifndef PROGRAM_NAME
+#define PROGRAM_NAME "?"     // Sequence.h names its program (the editor's Program menu)
+#endif
 
 // =============================================================================
 // TEST SETTINGS  (change these for bench work)
@@ -93,7 +96,7 @@ bool slideUsed = false;           // a step of this run has commanded the slides
 bool slideDone = true;            // the slides' last move has arrived (latched until the next slide command)
 bool shortLogged = false;         // SETTLED_SHORT logged for this move
 bool fallbackUsed = false;
-bool resetting = false;           // a STEP_STOP row ended the run: going back to the start pose
+uint8_t resetting = 0;            // a STEP_STOP row ended the run: 1 = slides in, servos at A_RESET / S_RESET; 2 = servos to the start pose
 unsigned long resetMs = 0;
 bool waitingForGo = false;
 bool consoleMode = (RUN_MODE == RUN_CONSOLE);   // true = bench: wait for commands
@@ -399,6 +402,10 @@ void __attribute__((noinline)) jogServo(ServoAxis& ax, float speed, float acc, f
   ax.setLimits(speed * 0.5f, acc * 0.25f, dec * 0.25f);
   ax.moveTo(deg);
 }
+void __attribute__((noinline)) jogPose(float a, float s) {   // both servos at jog speed
+  jogServo(arm, ARM_SPEED, ARM_ACCEL, ARM_DECEL, a);
+  jogServo(scoop, SCOOP_SPEED, SCOOP_ACCEL, SCOOP_DECEL, s);
+}
 void __attribute__((noinline)) slideGo(float mm, float v) {
   slide.setProfileLimits(mmToCounts(v), mmToCounts(SLIDE_ACCEL), mmToCounts(SLIDE_DECEL));
   slide.setTarget(mmToCounts(mm < 0.0f ? 0.0f : mm), SLIDE_MAX_PWM);
@@ -407,20 +414,27 @@ void __attribute__((noinline)) slideGo(float mm, float v) {
 
 // STEP_STOP: back to the start pose like the editor's Reset (servos at jog speed, slides to 0 at 300 mm/s), then DONE
 void __attribute__((noinline)) startReset() {
-  resetting = true;
+  resetting = 1;
   resetMs = millis();
   logEvent(F("STOP_HERE"), stepIndex);
   scoop.stopVibration();
-  jogServo(arm, ARM_SPEED, ARM_ACCEL, ARM_DECEL, A_START);
-  jogServo(scoop, SCOOP_SPEED, SCOOP_ACCEL, SCOOP_DECEL, S_START);
+  jogPose(A_RESET, S_RESET);      // clear of the slides first
   slideGo(0.0f, 300.0f);
 }
 
 void updateRunner() {
   if (runState != R_RUNNING) return;
 
-  if (resetting) {   // done when the moves are (8 s at most), or the slides stall (zero not quite at the stop)
-    if ((armDone() && scoopDone() && slide.isProfileFinished()) || slideStalled || millis() - resetMs > 8000UL) finishRun();
+  if (resetting) {
+    const unsigned long el = millis() - resetMs;
+    if (resetting == 1) {   // slides in (or stalled at the stop), then the servos go to the start pose
+      if (el > 12000UL) { finishRun(); return; }   // slides never got in: the servos stay clear of them (A_RESET / S_RESET)
+      if ((slide.isProfileFinished() && fabs(slideMm()) <= SLIDE_SETTLED_TOL_MM) || slideStalled) {
+        if (slideStalled) slide.setMode(MotorController::COAST);
+        resetting = 2; resetMs = millis();
+        jogPose(A_START, S_START);
+      }
+    } else if ((armDone() && scoopDone()) || el > 6000UL) finishRun();
     return;
   }
 
@@ -459,7 +473,7 @@ void startRun(uint8_t first) {
   slideTargetMm = slideMm();                       // wherever a jog left them
   digitalWrite(END_LED_PIN, LOW);
   runState = R_RUNNING;
-  resetting = false;
+  resetting = 0;
   logEvent(F("RUN_START"), first);
   const uint8_t f = nextRunStep((int16_t)first - 1);   // a skipped first row: start at the next one
   if (f == 255) { finishRun(); return; }
@@ -470,7 +484,7 @@ void printConfig();
 
 void finishRun() {
   runState = R_DONE;
-  resetting = false;
+  resetting = 0;
   slide.setMode(MotorController::COAST);
   scoop.stopVibration();
   arm.jumpTo(arm.getCommand());          // freeze anything cut short
@@ -592,6 +606,8 @@ void logTelemetry() {
   loopMaxUs = 0;
 }
 
+void __attribute__((noinline)) printProgram() { Serial.print(F("#PROGRAM,")); Serial.println(F(PROGRAM_NAME)); }   // which program (Sequence.h) is uploaded
+
 void printHeader() {
   Serial.print(F("#FW,")); Serial.print(FW_NAME);
   Serial.print(F(",schema=")); Serial.print(LOG_SCHEMA);
@@ -601,6 +617,7 @@ void printHeader() {
   Serial.print(F("#STATES,IDLE"));
   for (uint8_t i = 0; i < NUM_STEPS; i++) { Serial.print(','); printStepName(i); }
   Serial.println(F(",DONE"));
+  printProgram();
 }
 
 // prints v with dp decimals using integer maths (avoids the float printer)
@@ -639,8 +656,6 @@ void printConfig() {
   cfgF(F("ARM_R_CAL_US"), ARM_R_CAL_US);
   cfgF(F("ARM_L_CAL_US"), ARM_L_CAL_US);
   cfgF(F("SCOOP_CAL_US"), SCOOP_CAL_US);
-  cfgF(F("ARM_US_PER_DEG_REAL"), ARM_US_PER_DEG);
-  cfgF(F("SCOOP_US_PER_DEG_REAL"), SCOOP_US_PER_DEG);
   cfgF(F("X_CREEP"), X_CREEP);
   cfgF(F("X_TIP"), X_TIP);
   // slide gains (counts)
@@ -699,6 +714,7 @@ void listSteps() {
   for (uint8_t i = 0; i < NUM_STEPS; i++) {
     Serial.print(F("#STEP,")); Serial.print(i); Serial.print(','); printStepName(i); Serial.println();
   }
+  printProgram();
 }
 
 void printPose() {
@@ -832,7 +848,10 @@ void processCommand(char* cmd) {
         const float tgt = mmToCounts(a3);
         if (fabs(tgt - slide.getTarget()) > 1.0f) {        // re-plan only when the target moved
           const float dir = tgt - slide.getPosition();
-          float pv = (slide.getMode() == MotorController::ACTIVE) ? slide.getProfileVelocity() * dir : 0.0f;
+          // start from how fast the slides really move (measured): the profile speed is 0 once it caught up with a
+          // late streamed target, and re-planning from 0 cut the power mid-run (the "catch" in the 16 Oct live runs)
+          const MotorController::MotorMode md = slide.getMode();
+          float pv = (md == MotorController::ACTIVE || md == MotorController::OPEN_LOOP) ? slide.getVelocity() * dir : 0.0f;
           float ev = mmToCounts(a4) * dir;                // > 0 = same way as the move
           slide.setProfileLimits(mmToCounts(SLIDE_RETRACT_SPEED), mmToCounts(SLIDE_RETRACT_ACCEL), mmToCounts(SLIDE_RETRACT_DECEL));
           slide.setTargetBlend(tgt, SLIDE_MAX_PWM, pv > 0.0f ? pv / fabs(dir) : 0.0f, ev > 0.0f ? ev / fabs(dir) : 0.0f);

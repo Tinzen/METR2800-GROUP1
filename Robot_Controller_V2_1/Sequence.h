@@ -11,6 +11,7 @@
 // =============================================================================
 #pragma once
 #include "SequenceTypes.h"
+#define PROGRAM_NAME "Max speed"   // the editor's Program menu: which version of the sequence this is
 
 // ---- ARM ANGLES (deg) -------------------------------------------------------
 const float A_START    =  -31.6f;  // power-on pose (V2 940)
@@ -19,6 +20,7 @@ const float A_PEAK     =   62.3f;  // sweep lifts to here halfway (V2 350)
 const float A_SCOOP    =  110.3f;  // sweep ends here: scoop flat on the floor (V2 150)
 const float A_TRANSFER =  -40.2f;  // over the bucket (V2 920)
 const float A_MOVE     =   35.9f;  // clear of the slides (V2 500)
+const float A_RESET    =    35.9f;   // Reset / STEP_STOP: the arm waits here while the slides come in (added: = A_MOVE)
 
 // ---- SCOOP ANGLES (deg) -----------------------------------------------------
 const float S_START    =    5.4f;  // power-on pose (V2 2300 us)
@@ -27,6 +29,7 @@ const float S_SCOOP    =  -79.6f;  // end of sweep: blade flat on the floor (V2 
 const float S_PICKUP   =  -33.7f;  // lip up (V2 2100 us)
 const float S_CARRY    =   -89.6f;  // during the lift: keeps the rocks in (V2 transfer pose, 1800 us)
 const float S_POUR     = -80.2f;  // at the top: tip further to pour (V1 tipped ~17 deg more here)
+const float S_RESET    =  -250.0f;   // Reset / STEP_STOP: the scoop waits here while the slides come in (added: = S_DOWN)
 
 // ---- SLIDE POSITIONS (mm) ---------------------------------------------------
 const float X_CREEP    =  1665.0f;  // slow down here, just before the bucket touches the pole (was 3000 at the old 0.5317 mm/count scale)
@@ -66,6 +69,10 @@ const int   VIBRATE_HALF_PERIOD_MS = 50;   // 10 Hz, like V1
 //            | WAIT_SLIDE_ARRIVED(ms) | WAIT_ARM(%) | WAIT_SCOOP(%) | WAIT_SLIDE(%)
 //            "arrived" + ms waits after arriving; a negative ms goes that long before arriving.
 // OR AFTER: ms after which the step ends anyway (something stuck). 0 = no limit.
+// A.ACC% A.DEC% / S.ACC% S.DEC%: this row's arm / scoop move speeds up / slows down at that % of
+//            ARM_ / SCOOP_ ACCEL and DECEL (100 = those; 1-255). Only that one move.
+// FLAG (testing): STEP_RUN normal | STEP_SKIP this row doesn't run | STEP_STOP the run ends after this row
+//            and the robot goes back to the start pose. Leave every row on STEP_RUN for the competition.
 // HOLD = that axis keeps doing what it was doing: a move still running when its step ends keeps going.
 const Step SEQUENCE[] PROGMEM = {
 //  STEP           ARM          deg/s      SCOOP      deg/s       SLIDE     SLIDE mm/s           VIBRATE      NEXT WHEN              OR AFTER A.ACC% A.DEC% S.ACC% S.DEC% FLAG

@@ -50,8 +50,10 @@ Pictures come from the twin with CAD estimates; the twin's angles are only exact
 - SLIDE: mm from fully in, or `HOLD`. Two slide rows in a row that keep going the same way **blend**: the first slows to the second's speed instead of stopping.
 - NEXT WHEN: `WAIT_MS(ms)`, `WAIT_ARRIVED(ms)` (**every** axis has stopped: arm, scoop, and the slides once they've been used this run, including moves started in earlier steps), `WAIT_ARM_ARRIVED(ms)` / `WAIT_SCOOP_ARRIVED(ms)` / `WAIT_SLIDE_ARRIVED(ms)` (just that axis), `WAIT_ARM(%)`, `WAIT_SCOOP(%)`, `WAIT_SLIDE(%)`. For the arrived ones, `+ms` waits that long after arriving and `-ms` moves on that long *before* arriving (from the profile's planned finish time), so the next move blends in. (Before 16 Oct, `WAIT_ARRIVED` only waited for the axes the step itself moved.)
 - A.ACC% A.DEC% S.ACC% S.DEC% (last four, optional): this row's arm / scoop move speeds up / slows down at that % of `ARM_` / `SCOOP_` `ACCEL` / `DECEL` (1–255, 100 or left out = those). Only that row's move; HOLD axes ignore it.
-- FLAG (last column, optional, for testing): `STEP_RUN` (normal), `STEP_SKIP` (the row doesn't run), `STEP_STOP` (the run ends after the row: the robot goes back to `A_START` / `S_START` / slides 0 mm at jog speed, logs `E,STOP_HERE,<row>`, then DONE). Leave every row on `STEP_RUN` for the competition; the editor shows a red TEST chip while one is set.
+- FLAG (last column, optional, for testing): `STEP_RUN` (normal), `STEP_SKIP` (the row doesn't run), `STEP_STOP` (the run ends after the row: slides to 0 mm with the arm / scoop at `A_RESET` / `S_RESET`, then `A_START` / `S_START` once the slides are in, at jog speed; logs `E,STOP_HERE,<row>`, then DONE). Leave every row on `STEP_RUN` for the competition; the editor shows a red TEST chip while one is set.
 - OR AFTER (optional, before the % columns): a time limit in ms. The step moves on after it even if NEXT WHEN never comes true, and logs `E,STEP_LIMIT,<step>`. `0` (or left out) = no limit. It scales with `k` like the other times.
+
+**Programs:** `programs/*.h` hold versions of the whole sequence (Max speed, Slow 20 s, Slow 30 s); `Sequence.h` is a copy of the one picked in the editor's Program menu (`#define PROGRAM_NAME`), and it's the only one compiled. The robot prints `#PROGRAM,<name>` at start-up.
 
 ## Editing and tuning
 
@@ -103,4 +105,4 @@ Edit `SLIDE_STEP_UP` in `RobotConfig.h` (and the spec in `ROBOT_SPECS.md`). Slid
 
 Same `D` columns as before so `tools/run_viewer.html` still works: arm logged as 0–1000 (650 = vertical, 5 per degree), scoop as µs-equivalent (2300 = 0°, 6.667 per degree), slides in encoder counts. `#STATES` carries the step names, `S` lines mark each step, `#CFG` lists calibration and gains.
 
-Flash 29,020 B of 30,720 B, RAM 1,146 B of 2 KB with avr-gcc 7.3 and a stand-in Encoder library (16 Oct); the IDE showed about 1 KB more flash than this build, so check its number after uploading (no Adafruit servo library: a 30-line PCA9685 driver with the same 50 Hz setup).
+Flash 29,108 B of 30,720 B, RAM 1,146 B of 2 KB with avr-gcc 7.3 and a stand-in Encoder library (16 Oct); the IDE showed about 1 KB more flash than this build, so check its number after uploading (no Adafruit servo library: a 30-line PCA9685 driver with the same 50 Hz setup).

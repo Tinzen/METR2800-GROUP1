@@ -15,7 +15,7 @@ Status tags:
 
 | Item | Value | Status | Code (files) |
 |---|---|---|---|
-| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1: 29,020 B / 1,146 B with avr-gcc here (16 Oct); the IDE reads about 1 KB more flash. | confirmed | n/a |
+| Board | Arduino Nano (ATmega328P, 30 KB usable flash, 2 KB RAM). V2.1: 29,108 B / 1,146 B with avr-gcc here (16 Oct); the IDE reads about 1 KB more flash. | confirmed | n/a |
 | Outtake driver | Heatsinked **IN1/IN2 + PWM** board (part number not recorded) | confirmed 14 Oct | n/a |
 | Motor dir A | **D8** | confirmed 14 Oct | `OUTTAKE_MA` (V2_1 `RobotConfig.h`, calibration/Slide_Test, Slide_PID_Tune); `MOTOR_A` (calibration/Slide_Encoder_Check) |
 | Motor dir B | **D9** | confirmed 14 Oct | `OUTTAKE_MB`, `MOTOR_B` |

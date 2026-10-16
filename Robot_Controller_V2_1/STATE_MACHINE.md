@@ -15,7 +15,7 @@ Files: `Sequence.h` (the table), `Robot_Controller_V2_1.ino` (the runner: `enter
 | Entry action | `enterStep(i)`: reads the row and **starts** the arm, scoop and slide moves and the vibration |
 | During action | Every `loop()`: servo profiles, slide PID (every 10 ms), safety monitors, telemetry |
 | Transition guard | The **NEXT WHEN** column, checked by `stepConditionMet()` every loop, **or** the row's **OR AFTER** time limit |
-| Next state | The **next row** that isn't `STEP_SKIP` (`nextRunStep()`). Other jumps: the fault transitions (section 4), and `STEP_STOP` (the run ends after that row: back to the start pose, then DONE) |
+| Next state | The **next row** that isn't `STEP_SKIP` (`nextRunStep()`). Other jumps: the fault transitions (section 4), and `STEP_STOP` (the run ends after that row: slides in with the arm / scoop at `A_RESET` / `S_RESET`, then the start pose, then DONE) |
 | Exit action | None. A move still running when its row ends **keeps going** (that's how steps overlap) |
 | Top-level states | `runState`: `R_IDLE` → `R_RUNNING` ⇄ `R_PAUSED` (step mode) → `R_DONE`. Plus `consoleMode` (bench): set by `b` within 150 ms of power-up (the editor's **Hold still**) or by `RUN_CONSOLE`; the robot then waits for commands instead of running |
 
